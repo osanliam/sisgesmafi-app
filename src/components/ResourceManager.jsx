@@ -93,21 +93,37 @@ function ResourceManager() {
   return (
     <div className="space-y-6">
       
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Module Header Banner (Full Width 3D) */}
+      <section className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-5 text-left relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#e11d48]/5 rounded-full blur-2xl pointer-events-none" />
+        <style>{`
+          .emoji-3d-header {
+            font-size: 2.25rem;
+            line-height: 1;
+            display: inline-block;
+            filter: drop-shadow(0 1px 0 #fca5a5)
+                    drop-shadow(0 2px 0 #f43f5e)
+                    drop-shadow(0 3px 0 #e11d48)
+                    drop-shadow(0 5px 6px rgba(225, 29, 72, 0.3));
+            transform: scale(1.05);
+          }
+        `}</style>
+        <span className="emoji-3d-header shrink-0">📦</span>
         <div>
-          <h2 className="text-3xl font-extrabold tracking-tight">Recursos e Inventario</h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Gestión de aulas, laboratorios y préstamo de equipos tecnológicos.</p>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">Recursos e Inventario</h2>
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">Gestión de aulas, laboratorios y préstamo de equipos tecnológicos.</p>
         </div>
-        <div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-neuro-primary flex items-center gap-1.5 text-xs py-2 px-3.5"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo Recurso
-          </button>
-        </div>
+      </section>
+
+      {/* Module Action Row */}
+      <div className="flex justify-end w-full">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="px-6 py-3 rounded-xl bg-[#e11d48] hover:bg-rose-700 text-white text-xs font-black tracking-widest transition-all shadow-[0_4px_12px_rgba(225,29,72,0.15)] flex items-center gap-1.5"
+        >
+          <Plus className="h-4 w-4" />
+          Nuevo Recurso
+        </button>
       </div>
 
       {/* Booking Form Card */}

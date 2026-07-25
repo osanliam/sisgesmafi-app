@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EduCore - Acceso Seguro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#505f76",
+                    "error": "#ba1a1a",
+                    "on-secondary-container": "#fffbff",
+                    "surface-variant": "#e2e2e2",
+                    "primary-fixed": "#d3e3ff",
+                    "on-primary-container": "#75859d",
+                    "surface-container-low": "#f3f3f4",
+                    "secondary-fixed-dim": "#ffb3b6",
+                    "module-green": "#10B981",
+                    "inverse-on-surface": "#f0f1f1",
+                    "module-yellow": "#F59E0B",
+                    "on-background": "#1a1c1c",
+                    "on-surface": "#1a1c1c",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-dim": "#dadada",
+                    "secondary-container": "#e21e49",
+                    "outline": "#74777d",
+                    "on-surface-variant": "#44474d",
+                    "inverse-primary": "#b7c7e2",
+                    "background": "#f9f9f9",
+                    "on-tertiary-container": "#aa767b",
+                    "tertiary": "#000000",
+                    "on-secondary-fixed": "#40000c",
+                    "text-muted": "#5C647A",
+                    "surface": "#f9f9f9",
+                    "module-blue": "#3B82F6",
+                    "surface-subtle": "#F8FAFC",
+                    "tertiary-fixed": "#ffdadc",
+                    "surface-container-highest": "#e2e2e2",
+                    "on-error-container": "#93000a",
+                    "surface-container-high": "#e8e8e8",
+                    "secondary": "#ba0035",
+                    "on-primary-fixed": "#0b1c30",
+                    "secondary-fixed": "#ffdada",
+                    "on-secondary-fixed-variant": "#920028",
+                    "on-tertiary": "#ffffff",
+                    "on-tertiary-fixed-variant": "#653b3f",
+                    "on-tertiary-fixed": "#321115",
+                    "surface-container": "#eeeeee",
+                    "on-primary-fixed-variant": "#38485e",
+                    "module-orange": "#F97316",
+                    "tertiary-container": "#321115",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed-dim": "#b7c7e2",
+                    "error-container": "#ffdad6",
+                    "outline-variant": "#c4c6cd",
+                    "surface-bright": "#f9f9f9",
+                    "inverse-surface": "#2f3131",
+                    "primary": "#000000",
+                    "on-error": "#ffffff",
+                    "primary-container": "#0b1c30",
+                    "tertiary-fixed-dim": "#f3b7bc",
+                    "on-primary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "40px",
+                    "unit": "4px",
+                    "container-max": "1280px"
+            },
+            "fontFamily": {
+                    "label-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-xl": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "body-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .floating-shape {
+            position: absolute;
+            z-index: 0;
+            filter: blur(80px);
+            opacity: 0.15;
+            animation: float 25s infinite alternate ease-in-out;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, -60px) scale(1.1); }
+            100% { transform: translate(-20px, 20px) scale(1); }
+        }
+
+        .gradient-btn {
+            background: linear-gradient(135deg, #000000 0%, #333333 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gradient-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .role-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border-width: 2px;
+        }
+
+        .role-radio:checked + .role-card {
+            border-color: #000000;
+            background-color: #ffffff;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .role-radio:checked + .role-card .icon-box {
+            background-color: #000000;
+            color: #ffffff;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(16px);
+        }
+
+        .brand-logo-container {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 bg-white">
+<!-- Modern Abstract Background -->
+<div class="fixed inset-0 pointer-events-none overflow-hidden">
+<div class="floating-shape bg-module-blue w-[600px] h-[600px] rounded-full -top-40 -left-40"></div>
+<div class="floating-shape bg-secondary w-[500px] h-[500px] rounded-full top-1/4 -right-40"></div>
+<div class="floating-shape bg-module-orange w-[400px] h-[400px] rounded-full -bottom-20 left-1/3"></div>
+</div>
+<!-- Login Container -->
+<div class="relative z-10 w-full max-w-[1100px] grid grid-cols-1 lg:grid-cols-12 bg-white rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.12)] overflow-hidden border border-surface-container/50">
+<!-- Visual Impact Side -->
+<div class="hidden lg:flex lg:col-span-5 flex-col justify-between p-16 bg-surface-subtle relative overflow-hidden">
+<div class="absolute inset-0 opacity-5">
+<div class="w-full h-full" style="background-image: radial-gradient(#000 1px, transparent 1px); background-size: 32px 32px;"></div>
+</div>
+<div class="relative z-10 space-y-6">
+<div class="inline-flex items-center gap-3 bg-white p-3 pr-6 rounded-2xl shadow-sm">
+<div class="bg-primary p-2 rounded-xl">
+<span class="material-symbols-outlined text-white text-2xl">hub</span>
+</div>
+<span class="font-headline-md text-headline-md font-extrabold text-primary tracking-tight">EduCore</span>
+</div>
+<div class="space-y-4 pt-8">
+<h1 class="font-headline-xl text-headline-xl text-primary leading-tight">
+                    El futuro de la <br/>
+<span class="text-secondary">educación</span> hoy.
+                </h1>
+<p class="font-body-lg text-body-lg text-text-muted max-w-sm">
+                    Gestiona, aprende e impulsa el potencial de tu comunidad con la plataforma LMS más innovadora.
+                </p>
+</div>
+</div>
+<div class="relative z-10">
+<div class="relative">
+<div class="absolute -top-12 -left-12 w-24 h-24 bg-module-yellow rounded-full blur-2xl opacity-20 animate-pulse"></div>
+<img alt="Modern Educational Illustration" class="w-full h-auto rounded-[32px] shadow-2xl border-4 border-white transform -rotate-2 hover:rotate-0 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPwzvbk7_WTVLiSqLBe6380hftshiu3AjstlXdHgoGsr5H2OkUB6UEcR4Tv-2FeD_0Rdotrd5ImfaFI883B-phe0pRFFC1nfQIAR_RcWJDCfOD1FJEPHpe3XiWniVJTDaixWbukT8CUSVeTyQiH8jMv3NM5SqYbOAGC6ud3MqZxzSXy93_oxmg0j3JB5KtahfsMFEhOcC8G4qSN7pAIJ9NZN9he0s63DPVuTWpmlbfjHgG4y9_NEgnIR3-kQMZ3OCarKv5uZP9Bwc"/>
+</div>
+</div>
+</div>
+<!-- Form Side -->
+<div class="lg:col-span-7 p-8 md:p-12 lg:p-20 flex flex-col justify-center bg-white">
+<div class="w-full max-w-[500px] mx-auto space-y-10">
+<div class="space-y-2">
+<h2 class="font-headline-lg text-headline-lg text-primary">Inicia Sesión</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Bienvenido de nuevo a tu ecosistema digital EduCore.</p>
+</div>
+<form class="space-y-8" id="loginForm">
+<!-- Role Selection - New Impactful Style -->
+<div class="space-y-4">
+<label class="font-label-md text-label-md text-primary uppercase tracking-widest text-[10px]">Selecciona tu perfil institucional</label>
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+<!-- Admin -->
+<label class="relative block">
+<input checked="" class="role-radio sr-only" name="role" type="radio" value="admin"/>
+<div class="role-card flex flex-col items-center justify-center p-4 border border-outline-variant/50 rounded-2xl text-center gap-2">
+<div class="icon-box w-10 h-10 rounded-xl flex items-center justify-center bg-blue-50 text-module-blue transition-colors">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">admin_panel_settings</span>
+</div>
+<span class="font-label-sm text-[11px] font-bold text-primary">Admin</span>
+</div>
+</label>
+<!-- Director -->
+<label class="relative block">
+<input class="role-radio sr-only" name="role" type="radio" value="director"/>
+<div class="role-card flex flex-col items-center justify-center p-4 border border-outline-variant/50 rounded-2xl text-center gap-2">
+<div class="icon-box w-10 h-10 rounded-xl flex items-center justify-center bg-red-50 text-secondary transition-colors">
+<span class="material-symbols-outlined text-2xl">account_balance</span>
+</div>
+<span class="font-label-sm text-[11px] font-bold text-primary">Director</span>
+</div>
+</label>
+<!-- Teacher -->
+<label class="relative block">
+<input class="role-radio sr-only" name="role" type="radio" value="maestro"/>
+<div class="role-card flex flex-col items-center justify-center p-4 border border-outline-variant/50 rounded-2xl text-center gap-2">
+<div class="icon-box w-10 h-10 rounded-xl flex items-center justify-center bg-green-50 text-module-green transition-colors">
+<span class="material-symbols-outlined text-2xl">menu_book</span>
+</div>
+<span class="font-label-sm text-[11px] font-bold text-primary">Docente</span>
+</div>
+</label>
+<!-- Student -->
+<label class="relative block">
+<input class="role-radio sr-only" name="role" type="radio" value="alumno"/>
+<div class="role-card flex flex-col items-center justify-center p-4 border border-outline-variant/50 rounded-2xl text-center gap-2">
+<div class="icon-box w-10 h-10 rounded-xl flex items-center justify-center bg-orange-50 text-module-orange transition-colors">
+<span class="material-symbols-outlined text-2xl">person</span>
+</div>
+<span class="font-label-sm text-[11px] font-bold text-primary">Alumno</span>
+</div>
+</label>
+<!-- Parent -->
+<label class="relative block">
+<input class="role-radio sr-only" name="role" type="radio" value="padre"/>
+<div class="role-card flex flex-col items-center justify-center p-4 border border-outline-variant/50 rounded-2xl text-center gap-2">
+<div class="icon-box w-10 h-10 rounded-xl flex items-center justify-center bg-purple-50 text-surface-tint transition-colors">
+<span class="material-symbols-outlined text-2xl">family_restroom</span>
+</div>
+<span class="font-label-sm text-[11px] font-bold text-primary">Padre</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Input Fields -->
+<div class="space-y-5">
+<div class="space-y-2">
+<label class="font-label-md text-label-md text-primary" for="email">Institucional Email</label>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">alternate_email</span>
+<input class="w-full pl-12 pr-4 py-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-body-md text-body-md" id="email" placeholder="usuario@institucion.edu" required="" type="email"/>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md text-primary" for="password">Contraseña</label>
+<a class="font-label-sm text-[13px] text-secondary font-bold hover:underline" href="#">Recuperar acceso</a>
+</div>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">lock_person</span>
+<input class="w-full pl-12 pr-12 py-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-body-md text-body-md" id="password" placeholder="••••••••" required="" type="password"/>
+<button class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors" type="button">visibility</button>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<input class="w-5 h-5 text-primary border-outline-variant/60 rounded-lg focus:ring-primary transition-all cursor-pointer" id="remember" type="checkbox"/>
+<label class="font-label-sm text-body-md text-on-surface-variant select-none cursor-pointer" for="remember">Mantener sesión activa</label>
+</div>
+</div>
+<button class="gradient-btn w-full py-5 rounded-[20px] font-label-md text-label-md text-white font-extrabold flex items-center justify-center gap-3 shadow-xl" type="submit">
+<span>Acceder ahora</span>
+<span class="material-symbols-outlined text-xl">login</span>
+</button>
+<!-- SSO Section -->
+<div class="space-y-6">
+<div class="relative flex items-center py-2">
+<div class="flex-grow border-t border-outline-variant/30"></div>
+<span class="flex-shrink mx-4 font-label-sm text-outline text-[11px] uppercase tracking-widest">O continúa con</span>
+<div class="flex-grow border-t border-outline-variant/30"></div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-3 py-4 px-4 border border-outline-variant/50 rounded-2xl hover:bg-surface-subtle transition-all font-label-md text-primary font-bold group" type="button">
+<svg class="w-5 h-5 group-hover:scale-110 transition-transform" viewbox="0 0 24 24">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+</svg>
+                            Google
+                        </button>
+<button class="flex items-center justify-center gap-3 py-4 px-4 border border-outline-variant/50 rounded-2xl hover:bg-surface-subtle transition-all font-label-md text-primary font-bold group" type="button">
+<svg class="w-5 h-5 text-[#0078D4] group-hover:scale-110 transition-transform" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z"></path>
+</svg>
+                            Microsoft
+                        </button>
+</div>
+</div>
+</form>
+<div class="pt-6 text-center">
+<p class="font-body-md text-on-surface-variant">
+                    ¿Nuevo en la comunidad? <a class="text-secondary font-extrabold hover:underline" href="#">Solicitar acceso institucional</a>
+</p>
+</div>
+</div>
+</div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('loginForm');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const togglePass = form.querySelector('button[type="button"].material-symbols-outlined');
+        const passInput = document.getElementById('password');
+
+        // Password visibility toggle
+        togglePass.addEventListener('click', () => {
+            const type = passInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passInput.setAttribute('type', type);
+            togglePass.textContent = type === 'password' ? 'visibility' : 'visibility_off';
+        });
+
+        // Form submission animation
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.classList.remove('gradient-btn');
+            submitBtn.classList.add('bg-primary');
+            submitBtn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Autenticando...</span>
+            `;
+            
+            setTimeout(() => {
+                submitBtn.classList.remove('bg-primary');
+                submitBtn.classList.add('bg-module-green');
+                submitBtn.innerHTML = `
+                    <span class="material-symbols-outlined">verified</span>
+                    <span>¡Acceso Autorizado!</span>
+                `;
+            }, 1800);
+        });
+
+        // Role selection visual feedback
+        const roles = document.querySelectorAll('.role-radio');
+        roles.forEach(role => {
+            role.addEventListener('change', function() {
+                roles.forEach(r => {
+                    const card = r.nextElementSibling;
+                    const icon = card.querySelector('.material-symbols-outlined');
+                    if (r.checked) {
+                        icon.style.fontVariationSettings = "'FILL' 1";
+                    } else {
+                        icon.style.fontVariationSettings = "'FILL' 0";
+                    }
+                });
+            });
+        });
+    });
+</script>
+</body></html>

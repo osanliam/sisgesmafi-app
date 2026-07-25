@@ -1,5 +1,6 @@
 import React, { useState, useContext, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import MitoSachamamaFicha, { getMitoScore } from './MitoSachamamaFicha';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { 
   ClipboardCheck, 
@@ -22,9 +23,24 @@ import {
   AlertTriangle,
   FileText,
   CheckSquare,
-  Copy
+  Copy,
+  MoreVertical
 } from 'lucide-react';
 import axios from 'axios';
+import { canViewEvaluation, ratioToLiteralGrade } from '../utils/evaluationAccess';
+
+// Older copied exams occasionally retained their subquestion content but lost
+// the `hasSubQuestions` flag.  The content is the source of truth: a choice
+// question containing an ABC/numeric/nested subquestion is a container, not a
+// new multiple-choice question with placeholder alternatives.
+const hasNestedSubquestions = (question) => Boolean(
+  question?.hasSubQuestions || (
+    question?.type !== 'matching' &&
+    question?.subQuestions?.some(subQuestion =>
+      ['abc', 'numeric', 'matching'].includes(subQuestion?.type)
+    )
+  )
+);
 
 function GradingPortal({
   embeddedCourseId,
@@ -43,7 +59,7 @@ function GradingPortal({
     grades: contextGrades,
     saveGrade,
     saveGradesBatch,
-    gradingScale,
+    gradingScale: configuredGradingScale,
     evaluations: contextEvaluations,
     saveEvaluation,
     deleteEvaluation,
@@ -57,6 +73,18 @@ function GradingPortal({
   const grades = contextGrades || [];
   const evaluations = contextEvaluations || [];
   const reinforcementGrades = contextReinforcementGrades || [];
+  const canAccessEvaluation = (evaluation, section = selectedSection) => canViewEvaluation(evaluation, {
+    role: currentRole,
+    userId: currentUser?.id,
+    section
+  });
+
+  const getGradeRecord = (studentId, evalId) => {
+    return grades.find(g => 
+      g.studentId === studentId && 
+      (g.evaluationId === evalId || g.evaluationId.startsWith(evalId + '_'))
+    );
+  };
 
   // 1. Selector States
   const [localGrade, setLocalGrade] = useState(() => {
@@ -271,6 +299,7 @@ function GradingPortal({
 
   // Copy evaluation modal states
   const [copyingEvaluation, setCopyingEvaluation] = useState(null);
+  const [openEvaluationMenuId, setOpenEvaluationMenuId] = useState(null);
   const [targetCourseId, setTargetCourseId] = useState('');
   const [targetCompetenceId, setTargetCompetenceId] = useState('');
   const [targetCapacityId, setTargetCapacityId] = useState('');
@@ -279,6 +308,7 @@ function GradingPortal({
   const [targetGrade, setTargetGrade] = useState('');
   const [targetSection, setTargetSection] = useState('');
   const [copyGradesOption, setCopyGradesOption] = useState(false);
+  const [copyToFormativeOption, setCopyToFormativeOption] = useState(false);
 
   // Target course configuration for Copy Modal
   const targetCourseObj = useMemo(() => {
@@ -384,6 +414,7 @@ function GradingPortal({
       setTargetGrade(selectedGrade === 'Todas' ? '' : selectedGrade);
       setTargetSection(selectedSection === 'Todas' ? '' : selectedSection);
       setCopyGradesOption(false);
+      setCopyToFormativeOption(false);
     }
   }, [copyingEvaluation]);
 
@@ -395,7 +426,7 @@ function GradingPortal({
     targetGrade.trim().toLowerCase() === selectedGrade.trim().toLowerCase() && 
     targetSection.trim().toLowerCase() === selectedSection.trim().toLowerCase();
 
-  const handleCopyEvaluationSubmit = (e) => {
+  const handleCopyEvaluationSubmit = async (e) => {
     e.preventDefault();
     if (!copyingEvaluation) return;
     if (!targetCourseId || !targetCompetenceId) {
@@ -405,7 +436,7 @@ function GradingPortal({
       return alert('Debe seleccionar grado y sección de destino.');
     }
 
-    const success = copyEvaluation(
+    const success = await copyEvaluation(
       copyingEvaluation.id,
       targetCourseId,
       targetCompetenceId,
@@ -416,7 +447,8 @@ function GradingPortal({
       selectedGrade,
       selectedSection,
       targetGrade,
-      targetSection
+      targetSection,
+      copyToFormativeOption
     );
 
     if (success) {
@@ -483,13 +515,74 @@ function GradingPortal({
 
   // Filter evaluations for current context
   const activeEvaluations = useMemo(() => {
-    return evaluations.filter(e => 
-      e.courseId === selectedCourseId &&
-      e.competenceId === selectedCompetenceId &&
-      (e.bimester || '1') === selectedBimester &&
-      (e.unit !== undefined && e.unit !== null ? String(e.unit) : '0') === selectedUnit
-    );
-  }, [evaluations, selectedCourseId, selectedCompetenceId, selectedBimester, selectedUnit]);
+    // Helper: detect old-style clones by ID pattern {anything}_{a|b|c|d|e|todas}
+    const _isSectionClone = (id) => {
+      if (!id) return false;
+      const parts = id.split('_');
+      return ['a','b','c','d','e','todas'].includes(parts[parts.length - 1]);
+    };
+
+    const currentSection = (selectedSection && selectedSection !== 'Todas')
+      ? selectedSection.toLowerCase()
+      : null;
+
+    return evaluations.filter(e => {
+      if (!canAccessEvaluation(e)) return false;
+      if (e.courseId !== selectedCourseId) return false;
+      if (e.competenceId !== selectedCompetenceId) return false;
+      if ((e.bimester || '1') !== selectedBimester) return false;
+      if ((e.unit !== undefined && e.unit !== null ? String(e.unit) : '0') !== selectedUnit) return false;
+
+      if (e.isFormative) return false;
+
+      return true;
+    });
+  }, [evaluations, grades, selectedCourseId, selectedCompetenceId, selectedBimester, selectedUnit, selectedSection]);
+
+  const gradingScale = useMemo(() => {
+    const explicit = activeEvaluations.find(e => e.gradingScale || e.maxGradeScale);
+    if (explicit?.gradingScale) return String(explicit.gradingScale);
+    if (explicit?.maxGradeScale === 'A' || explicit?.maxGradeScale === 'AD') return 'literal';
+    const activeIds = new Set(activeEvaluations.map(e => e.id));
+    const periodScores = grades
+      .filter(g => activeIds.has(g.evaluationId))
+      .map(g => typeof g.score === 'string' ? g.score.trim().toUpperCase() : g.score);
+    if (periodScores.some(score => ['AD', 'A', 'B', 'C'].includes(score))) return 'literal';
+    if (String(selectedUnit) === '2') return 'literal';
+    return configuredGradingScale;
+  }, [activeEvaluations, grades, selectedUnit, configuredGradingScale]);
+
+  // Unit 2 may contain historical numeric records (for example 17) together
+  // with literal records.  Normalize both before averaging: A=3, B=2, C=1.
+  const unit2Literal = (score) => {
+    const normalized = String(score ?? '').trim().toUpperCase();
+    if (['A', 'B', 'C'].includes(normalized)) return normalized;
+    return ratioToLiteralGrade((Number(score) || 0) / 20, { unit: '2', maxGradeScale: 'A' });
+  };
+
+  const literalFromRatio = (ratio, evaluation = gradingEval) => ratioToLiteralGrade(ratio, {
+    unit: evaluation?.unit ?? selectedUnit,
+    maxGradeScale: evaluation?.maxGradeScale || ((evaluation?.type === 'Rúbrica' || evaluation?.type === 'Rubrica') ? 'AD' : 'A')
+  });
+
+  const literalAverage = (scores, unit = selectedUnit) => {
+    const isUnit2 = String(unit) === '2';
+    const values = scores.map(score => {
+      const literal = isUnit2 ? unit2Literal(score) : String(score).trim().toUpperCase();
+      return literal === 'AD' ? 4 : literal === 'A' ? 3 : literal === 'B' ? 2 : literal === 'C' ? 1 : null;
+    }).filter(value => value !== null);
+    if (!values.length) return '-';
+
+    const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+    if (isUnit2) {
+      const rounded = Math.round(average);
+      return rounded >= 3 ? 'A' : rounded === 2 ? 'B' : 'C';
+    }
+    if (average >= 3.5) return 'AD';
+    if (average >= 2.5) return 'A';
+    if (average >= 1.5) return 'B';
+    return 'C';
+  };
 
   // 2. Modals Control States
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -685,6 +778,9 @@ function GradingPortal({
       capacityId: newEvalCapacityId || null,
       bimester: selectedBimester,
       unit: selectedUnit,
+      section: selectedSection === 'Todas' ? null : selectedSection,
+      sections: selectedSection === 'Todas' ? [] : [selectedSection],
+      gradeLevel: selectedGrade === 'Todas' ? null : selectedGrade,
       name: newEvalName.trim(),
       type: newEvalType,
       instrumentConfig: createDefaultInstrumentConfig(newEvalType)
@@ -717,6 +813,9 @@ function GradingPortal({
       capacityId: cap1,
       bimester: selectedBimester,
       unit: selectedUnit,
+      section: selectedSection === 'Todas' ? null : selectedSection,
+      sections: selectedSection === 'Todas' ? [] : [selectedSection],
+      gradeLevel: selectedGrade === 'Todas' ? null : selectedGrade,
       name:"Examen Parcial",
       type:"Examen",
       instrumentConfig: {}
@@ -728,6 +827,9 @@ function GradingPortal({
       capacityId: cap2,
       bimester: selectedBimester,
       unit: selectedUnit,
+      section: selectedSection === 'Todas' ? null : selectedSection,
+      sections: selectedSection === 'Todas' ? [] : [selectedSection],
+      gradeLevel: selectedGrade === 'Todas' ? null : selectedGrade,
       name:"Lista de Cotejo de Actividades",
       type:"Lista de Cotejo",
       instrumentConfig: createDefaultInstrumentConfig("Lista de Cotejo")
@@ -739,6 +841,9 @@ function GradingPortal({
       capacityId: cap3,
       bimester: selectedBimester,
       unit: selectedUnit,
+      section: selectedSection === 'Todas' ? null : selectedSection,
+      sections: selectedSection === 'Todas' ? [] : [selectedSection],
+      gradeLevel: selectedGrade === 'Todas' ? null : selectedGrade,
       name:"Rúbrica de Proyecto",
       type:"Rubrica",
       instrumentConfig: createDefaultInstrumentConfig("Rubrica")
@@ -756,11 +861,11 @@ function GradingPortal({
     setGradingEval(evaluation);
 
     // Find if there's an existing grade
-    const match = grades.find(g => g.studentId === student.id && g.evaluationId === evaluation.id);
+    const match = getGradeRecord(student.id, evaluation.id);
 
     if (match && match.details) {
       // Load saved states
-      if (evaluation.type === 'Examen') {
+      if (evaluation.type === 'Examen' || evaluation.type === 'Práctica' || evaluation.type === 'Practica') {
         setTempExamScore(match.score);
         setTempExamSelections(match.details.examSelections || {});
       } else if (evaluation.type === 'Rubrica') {
@@ -787,7 +892,7 @@ function GradingPortal({
 
   // Helper to extract grade cell score
   const getCellScore = (studentId, evaluationId) => {
-    const record = grades.find(g => g.studentId === studentId && g.evaluationId === evaluationId);
+    const record = getGradeRecord(studentId, evaluationId);
     return record ? record.score : '-';
   };
 
@@ -841,83 +946,108 @@ function GradingPortal({
     const isLiteral = gradingScale === 'literal';
     if (!gradingEval) return"";
 
-    if (gradingEval.type === 'Examen') {
-      const questions = gradingEval.instrumentConfig?.questions || [];
+    if (gradingEval.type === 'Examen' || gradingEval.type === 'Práctica' || gradingEval.type === 'Practica') {
+      const isMito = gradingEval.name?.toLowerCase().includes('mit') || gradingEval.name?.toLowerCase().includes('sachamama');
       
       // Check if there are any selections in tempExamSelections
-      const hasSelections = Object.values(tempExamSelections).some(v => {
+      const hasSelections = Object.values(tempExamSelections || {}).some(v => {
         if (typeof v === 'object' && v !== null) {
           return Object.values(v).some(val => val !== undefined && val !== null && val !== '');
         }
         return v !== undefined && v !== null && v !== '';
       });
-      if (!hasSelections) return"";
+      if (!hasSelections) return "";
 
       let ratio = 0;
-      if (questions.length > 0) {
-        let obtainedPoints = 0;
-        let totalMaxPoints = 0;
-        questions.forEach(q => {
-          const points = parseFloat(q.points) || 0;
-          totalMaxPoints += points;
-          if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
-            const subQs = q.subQuestions;
-            const subQPts = points / subQs.length;
-            const qSelections = tempExamSelections[q.id] || {};
-            
-            subQs.forEach(subQ => {
-              const selectedVal = qSelections[subQ.id];
-              if (subQ.type === 'choice') {
-                if (selectedVal === subQ.correctValue) {
-                  obtainedPoints += subQPts;
-                }
-              } else if (subQ.type === 'matching') {
-                const subMatchQs = subQ.subQuestions || [];
-                const matchQPts = subMatchQs.length > 0 ? (subQPts / subMatchQs.length) : 0;
-                const matchSelections = selectedVal || {};
-                subMatchQs.forEach(mQ => {
-                  if (matchSelections[mQ.id] === mQ.correctValue) {
-                    obtainedPoints += matchQPts;
-                  }
-                });
-              } else { // direct
-                if (selectedVal === true) {
-                  obtainedPoints += subQPts;
-                }
-              }
-            });
-          } else {
-            if (q.type === 'choice') {
-              if (tempExamSelections[q.id] === q.correctValue) {
-                obtainedPoints += points;
-              }
-            } else if (q.type === 'matching') {
-              const subQs = q.subQuestions || [];
-              const subQPts = subQs.length > 0 ? (points / subQs.length) : 0;
+      if (isMito) {
+        const score = getMitoScore(tempExamSelections);
+        ratio = score / 20;
+      } else {
+        const questions = gradingEval.instrumentConfig?.questions || [];
+        if (questions.length > 0) {
+          let obtainedPoints = 0;
+          let totalMaxPoints = 0;
+          questions.forEach(q => {
+            const points = parseFloat(q.points) || 0;
+            totalMaxPoints += points;
+            if (hasNestedSubquestions(q) && q.subQuestions && q.subQuestions.length > 0) {
+              const subQs = q.subQuestions;
+              const subQPts = points / subQs.length;
               const qSelections = tempExamSelections[q.id] || {};
+              
               subQs.forEach(subQ => {
-                if (qSelections[subQ.id] === subQ.correctValue) {
-                  obtainedPoints += subQPts;
+                const selectedVal = qSelections[subQ.id];
+                if (subQ.type === 'choice') {
+                  if (selectedVal === subQ.correctValue) {
+                    obtainedPoints += subQPts;
+                  }
+                } else if (subQ.type === 'abc') {
+                  if (selectedVal === 'A') {
+                    obtainedPoints += subQPts;
+                  } else if (selectedVal === 'B') {
+                    obtainedPoints += subQPts / 2;
+                  }
+                } else if (subQ.type === 'numeric') {
+                  if (selectedVal !== undefined && selectedVal !== null && !isNaN(selectedVal)) {
+                    obtainedPoints += Number(selectedVal);
+                  }
+                } else if (subQ.type === 'matching') {
+                  const subMatchQs = subQ.subQuestions || [];
+                  const matchQPts = subMatchQs.length > 0 ? (subQPts / subMatchQs.length) : 0;
+                  const matchSelections = selectedVal || {};
+                  subMatchQs.forEach(mQ => {
+                    if (matchSelections[mQ.id] === mQ.correctValue) {
+                      obtainedPoints += matchQPts;
+                    }
+                  });
+                } else { // direct
+                  if (selectedVal === true) {
+                    obtainedPoints += subQPts;
+                  }
                 }
               });
-            } else { // direct
-              if (tempExamSelections[q.id] === true) {
-                obtainedPoints += points;
+            } else {
+              if (q.type === 'choice') {
+                if (tempExamSelections[q.id] === q.correctValue) {
+                  obtainedPoints += points;
+                }
+              } else if (q.type === 'matching') {
+                const subQs = q.subQuestions || [];
+                const subQPts = subQs.length > 0 ? (points / subQs.length) : 0;
+                const qSelections = tempExamSelections[q.id] || {};
+                subQs.forEach(subQ => {
+                  if (qSelections[subQ.id] === subQ.correctValue) {
+                    obtainedPoints += subQPts;
+                  }
+                });
+              } else if (q.type === 'abc') {
+                const selectedVal = tempExamSelections[q.id];
+                if (selectedVal === 'A') {
+                  obtainedPoints += points;
+                } else if (selectedVal === 'B') {
+                  obtainedPoints += points / 2;
+                }
+              } else if (q.type === 'numeric') {
+                const selectedVal = tempExamSelections[q.id];
+                if (selectedVal !== undefined && selectedVal !== null && !isNaN(selectedVal)) {
+                  obtainedPoints += Number(selectedVal);
+                }
+              } else { // direct
+                if (tempExamSelections[q.id] === true) {
+                  obtainedPoints += points;
+                }
               }
             }
-          }
-        });
-        ratio = totalMaxPoints > 0 ? (obtainedPoints / totalMaxPoints) : 0;
-      } else {
-        // Fallback legado"El Dedo Mágico"
-        const score = getExamScore(tempExamSelections);
-        ratio = score / 20;
+          });
+          ratio = totalMaxPoints > 0 ? (obtainedPoints / totalMaxPoints) : 0;
+        } else {
+          const score = getExamScore(tempExamSelections);
+          ratio = score / 20;
+        }
       }
 
       if (isLiteral) {
-        if (ratio >= 0.75) return 'A';
-        if (ratio >= 0.40) return 'B';
-        return 'C';
+        return literalFromRatio(ratio);
       } else {
         const scaleVal = gradingScale === '20' ? 20 : 10;
         return parseFloat((ratio * scaleVal));
@@ -990,9 +1120,7 @@ function GradingPortal({
       const avg = ratio * 3;
 
       if (isLiteral) {
-        if (avg >= 2.5) return 'A';
-        if (avg >= 1.5) return 'B';
-        return 'C';
+        return literalFromRatio(ratio);
       } else {
         const scaleVal = gradingScale === '20' ? 20 : 10;
         return parseFloat((ratio * scaleVal).toFixed(2));
@@ -1016,9 +1144,7 @@ function GradingPortal({
       const ratio = yesCount / items.length;
 
       if (isLiteral) {
-        if (ratio >= 0.75) return 'A';
-        if (ratio >= 0.40) return 'B';
-        return 'C';
+        return literalFromRatio(ratio);
       } else {
         const scaleVal = gradingScale === '20' ? 20 : 10;
         return parseFloat((ratio * scaleVal));
@@ -1075,7 +1201,7 @@ function GradingPortal({
       return;
     }
 
-    const match = grades.find(g => g.studentId === gradingStudent.id && g.evaluationId === gradingEval.id);
+    const match = getGradeRecord(gradingStudent.id, gradingEval.id);
 
     const payload = {
       studentId: gradingStudent.id,
@@ -1107,7 +1233,7 @@ function GradingPortal({
     if (!gradingStudent || !gradingEval) return;
     if (liveCalculatedScore ==="") return; // Do not auto-save unfilled grade records
 
-    const match = grades.find(g => g.studentId === gradingStudent.id && g.evaluationId === gradingEval.id);
+    const match = getGradeRecord(gradingStudent.id, gradingEval.id);
 
     const payload = {
       studentId: gradingStudent.id,
@@ -1164,7 +1290,7 @@ function GradingPortal({
     if (activeEvaluations.length === 0) return '-';
 
     const scores = activeEvaluations.map(evalItem => {
-      const g = grades.find(record => record.studentId === studentId && record.evaluationId === evalItem.id);
+      const g = getGradeRecord(studentId, evalItem.id);
       return g ? g.score : null;
     }).filter(s => s !== null && s !== undefined && s !== '');
 
@@ -1172,21 +1298,7 @@ function GradingPortal({
     const isLiteral = gradingScale === 'literal';
 
     if (isLiteral) {
-      const points = scores.map(s => {
-        if (s === 'AD') return 4;
-        if (s === 'A') return 3;
-        if (s === 'B') return 2;
-        if (s === 'C') return 1;
-        return null;
-      }).filter(n => n !== null);
-
-      if (points.length === 0) return '-';
-      const avg = points.reduce((sum, val) => sum + val, 0) / points.length;
-
-      if (avg >= 3.5) return 'AD';
-      if (avg >= 2.5) return 'A';
-      if (avg >= 1.5) return 'B';
-      return 'C';
+      return literalAverage(scores);
     } else {
       const numericScores = scores.map(s => parseFloat(s)).filter(n => !isNaN(n));
       if (numericScores.length === 0) return '-';
@@ -1197,6 +1309,7 @@ function GradingPortal({
   // 6.b Promedios por Competencia para el Consolidado
   const getCompetenceAverage = (studentId, competenceId) => {
     const compEvals = evaluations.filter(e => 
+      canAccessEvaluation(e) &&
       e.courseId === selectedCourseId &&
       e.competenceId === competenceId &&
       (e.bimester || '1') === selectedBimester &&
@@ -1207,7 +1320,7 @@ function GradingPortal({
     if (compEvals.length === 0) return '-';
 
     const scores = compEvals.map(evalItem => {
-      const g = grades.find(record => record.studentId === studentId && record.evaluationId === evalItem.id);
+      const g = getGradeRecord(studentId, evalItem.id);
       return g ? g.score : null;
     }).filter(s => s !== null && s !== undefined && s !== '');
 
@@ -1215,21 +1328,7 @@ function GradingPortal({
     const isLiteral = gradingScale === 'literal';
 
     if (isLiteral) {
-      const points = scores.map(s => {
-        if (s === 'AD') return 4;
-        if (s === 'A') return 3;
-        if (s === 'B') return 2;
-        if (s === 'C') return 1;
-        return null;
-      }).filter(n => n !== null);
-
-      if (points.length === 0) return '-';
-      const avg = points.reduce((sum, val) => sum + val, 0) / points.length;
-
-      if (avg >= 3.5) return 'AD';
-      if (avg >= 2.5) return 'A';
-      if (avg >= 1.5) return 'B';
-      return 'C';
+      return literalAverage(scores);
     } else {
       const numericScores = scores.map(s => parseFloat(s)).filter(n => !isNaN(n));
       if (numericScores.length === 0) return '-';
@@ -1239,6 +1338,7 @@ function GradingPortal({
 
   const getCompetenceReinforcementAverage = (studentId, competenceId) => {
     const compReinEvals = evaluations.filter(e => 
+      canAccessEvaluation(e) &&
       e.courseId === selectedCourseId &&
       e.competenceId === competenceId &&
       (e.bimester || '1') === selectedBimester &&
@@ -1338,7 +1438,7 @@ function GradingPortal({
   // 6.d Exportar/Importar notas de una evaluación específica
   const handleExportEvalGrades = async (evalItem) => {
     try {
-      const evalGrades = grades.filter(g => g.evaluationId === evalItem.id);
+      const evalGrades = grades.filter(g => g.evaluationId === evalItem.id || g.evaluationId.startsWith(evalItem.id + '_'));
       const response = await axios.post('/api/excel/export-evaluation-grades', {
         evaluation: evalItem,
         students: enrolledStudents,
@@ -1685,7 +1785,7 @@ function GradingPortal({
     let count = 0;
     importPreview.forEach(item => {
       if (item.student && item.validGrade !== '') {
-        const match = grades.find(g => g.studentId === item.student.id && g.evaluationId === targetEvalId);
+        const match = getGradeRecord(item.student.id, targetEvalId);
         const payload = {
           studentId: item.student.id,
           courseId: selectedCourseId,
@@ -1987,7 +2087,7 @@ function GradingPortal({
         {viewMode === 'consolidado' ? (
           <div className="w-full overflow-hidden space-y-4">
             {/* Consolidado Spreadsheet */}
-            <div className="overflow-x-auto rounded-2xl border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 overflow-hidden">
+            <div className="overflow-x-auto rounded-lg border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 overflow-hidden">
               <table className="w-full border-collapse text-left text-sm text-slate-400">
                 <thead className="bg-white/10 text-xs font-bold uppercase text-slate-200">
                   <tr>
@@ -2064,9 +2164,29 @@ function GradingPortal({
                             return highlight ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-950/40 font-black px-3 py-1 rounded-lg text-sm' : 'text-rose-550 dark:text-rose-450 font-black text-sm';
                           };
 
+                          let tdClass = "px-2 py-2.5 text-center border border-slate-200 dark:border-slate-800 transition-all duration-150";
+                          if (finalGrade === 'AD') {
+                            tdClass += " cell-grade-ad";
+                          } else if (finalGrade === 'A') {
+                            tdClass += " cell-grade-a";
+                          } else if (finalGrade === 'B') {
+                            tdClass += " cell-grade-b";
+                          } else if (finalGrade === 'C') {
+                            tdClass += " cell-grade-c";
+                          } else if (typeof finalGrade === 'number') {
+                            const isPass = gradingScale === '20' ? finalGrade >= 11.0 : finalGrade >= 6.0;
+                            if (isPass) {
+                              tdClass += " bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 font-extrabold";
+                            } else {
+                              tdClass += " bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-extrabold";
+                            }
+                          } else {
+                            tdClass += " bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500";
+                          }
+
                           return (
-                            <td key={comp.id} className="px-2 py-2.5 text-center border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 bg-emerald-50/5">
-                              <span className={getGradeClass(finalGrade, true)}>
+                            <td key={comp.id} className={tdClass}>
+                              <span className="font-black text-xl">
                                 {finalGrade}
                               </span>
                             </td>
@@ -2082,21 +2202,21 @@ function GradingPortal({
         ) : (
           <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
             <div className="flex-1 w-full overflow-hidden space-y-4">
-              <div className="overflow-x-auto rounded-2xl border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50">
+              <div className="overflow-x-auto rounded-lg border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50">
                 <table className="w-full border-collapse text-left text-sm text-slate-400">
                   <thead className="bg-white/10 text-xs font-bold uppercase text-slate-200">
                     <tr>
-                      <th className="p-2 w-10 text-center">
+                      <th className="p-2 text-center sticky left-0 z-20 bg-[#0B1021]/95 backdrop-blur-sm shadow-[2px_0_5px_rgba(0,0,0,0.2)]" style={{ minWidth: '50px', width: '50px', maxWidth: '50px' }}>
                         <div className="glass-panel rounded-full px-2 py-2 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
                           N°
                         </div>
                       </th>
-                      <th className="p-2 min-w-[120px]">
+                      <th className="p-2 sticky left-[50px] z-20 bg-[#0B1021]/95 backdrop-blur-sm shadow-[2px_0_5px_rgba(0,0,0,0.2)]" style={{ minWidth: '220px', width: '220px', maxWidth: '220px' }}>
                         <div className="glass-panel rounded-full px-3 py-2 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
                           Estudiante
                         </div>
                       </th>
-                      <th className="p-2 w-20 text-center">
+                      <th className="p-2 text-center sticky left-[270px] z-20 bg-[#0B1021]/95 backdrop-blur-sm shadow-[2px_0_5px_rgba(0,0,0,0.2)]" style={{ minWidth: '90px', width: '90px', maxWidth: '90px' }}>
                         <div className="glass-panel rounded-full px-2 py-2 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
                           DNI
                         </div>
@@ -2104,24 +2224,37 @@ function GradingPortal({
                       
                       {/* Active Custom Evaluations columns */}
                       {activeEvaluations.map(evalItem => (
-                        <th key={evalItem.id} className="p-2 text-center min-w-[80px]">
-                          <div className="bg-transparent  rounded-lg p-3 border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50  flex flex-col items-center justify-between h-full gap-2">
-                            <span className="font-bold text-white dark:text-white" title={evalItem.name}>
+                        <th key={evalItem.id} className="p-1.5 text-center w-[116px] min-w-[116px] max-w-[116px]">
+                          <div className="bg-transparent rounded-lg px-2 py-2 border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 flex flex-col items-center h-full gap-1.5">
+                            <span className="font-bold text-[10px] leading-tight text-white dark:text-white w-full min-h-[28px] overflow-hidden" title={evalItem.name} style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                               {evalItem.name}
                             </span>
-                            <span className="text-[9px] bg-white/5 bg-white/5 px-1.5 py-0.5 rounded font-mono text-kinetic-cyan dark:text-cyan-200 font-bold uppercase">
+                            <span className="text-[8px] bg-white/5 px-1.5 py-0.5 rounded font-mono text-kinetic-cyan dark:text-cyan-200 font-bold uppercase max-w-full truncate">
                               {evalItem.type}
                             </span>
                             {evalItem.capacityId && (() => {
                               const cap = activeCompetence?.capacities?.find(c => c.id === evalItem.capacityId);
                               if (!cap) return null;
                               return (
-                                <span className="text-[9px] text-slate-400  font-semibold max-w-[125px] truncate mt-0.5" title={cap.name}>
+                                <span className="text-[8px] text-slate-400 font-semibold max-w-full truncate" title={cap.name}>
                                   Cap: {cap.name}
                                 </span>
                               );
                             })()}
-                            <div className="flex gap-1.5 pt-1">
+                            <div className="relative mt-auto pt-0.5">
+                              <button type="button" onClick={() => setOpenEvaluationMenuId(openEvaluationMenuId === evalItem.id ? null : evalItem.id)} title="Más acciones" className="p-1 rounded text-slate-400 hover:bg-white/20 hover:text-kinetic-cyan transition">
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                              {openEvaluationMenuId === evalItem.id && (
+                                <div className="absolute right-0 top-full z-40 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                                  <button type="button" onClick={() => { handleOpenConfigModal(evalItem); setOpenEvaluationMenuId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-cyan-50 dark:text-slate-300"><Settings className="h-3.5 w-3.5" /> Configurar</button>
+                                  <button type="button" onClick={() => { setCopyingEvaluation(evalItem); setOpenEvaluationMenuId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-cyan-50 dark:text-slate-300"><Copy className="h-3.5 w-3.5" /> Copiar</button>
+                                  <button type="button" onClick={() => { handleExportEvalGrades(evalItem); setOpenEvaluationMenuId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-emerald-50 dark:text-slate-300"><Download className="h-3.5 w-3.5" /> Exportar</button>
+                                  <button type="button" onClick={() => { handleImportEvalGrades(evalItem); setOpenEvaluationMenuId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-amber-50 dark:text-slate-300"><Upload className="h-3.5 w-3.5" /> Importar</button>
+                                  <button type="button" onClick={() => { setOpenEvaluationMenuId(null); if (window.confirm(`¿Deseas eliminar la columna \"${evalItem.name}\" y todas sus calificaciones?`)) deleteEvaluation(evalItem.id); }} className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold text-rose-600 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" /> Eliminar</button>
+                                </div>
+                              )}
+                              <div className="hidden">
                               <button 
                                 onClick={() => handleOpenConfigModal(evalItem)}
                                 title="Configurar Instrumento"
@@ -2136,20 +2269,23 @@ function GradingPortal({
                               >
                                 <Copy className="h-3.5 w-3.5" />
                               </button>
-                              <button 
-                                onClick={() => handleExportEvalGrades(evalItem)}
-                                title="Exportar a Excel"
-                                className="p-1 hover:bg-white/20  rounded text-slate-400 hover:text-emerald-500 transition"
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </button>
-                              <button 
-                                onClick={() => handleImportEvalGrades(evalItem)}
-                                title="Importar desde Excel"
-                                className="p-1 hover:bg-white/20  rounded text-slate-400 hover:text-amber-500 transition"
-                              >
-                                <Upload className="h-3.5 w-3.5" />
-                              </button>
+                              {/* Exportar/Importar Excel — ocultos temporalmente para mantener estética */}
+                              <div className="hidden">
+                                <button 
+                                  onClick={() => handleExportEvalGrades(evalItem)}
+                                  title="Exportar a Excel"
+                                  className="p-1 hover:bg-white/20  rounded text-slate-400 hover:text-emerald-500 transition"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </button>
+                                <button 
+                                  onClick={() => handleImportEvalGrades(evalItem)}
+                                  title="Importar desde Excel"
+                                  className="p-1 hover:bg-white/20  rounded text-slate-400 hover:text-amber-500 transition"
+                                >
+                                  <Upload className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                               <button 
                                 onClick={() => {
                                   if(window.confirm(`¿Deseas eliminar la columna"${evalItem.name}" y todas sus calificaciones?`)) {
@@ -2161,6 +2297,7 @@ function GradingPortal({
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
+                            </div>
                             </div>
                           </div>
                         </th>
@@ -2201,35 +2338,44 @@ function GradingPortal({
 
                         return (
                           <tr key={std.id} className="hover:bg-white/5/50  transition">
-                            <td className="px-4 py-3 font-bold text-slate-400 border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50">{idx + 1}</td>
-                            <td className="px-4 py-3 font-semibold text-white  border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50">
-                              <div className="flex items-center gap-2.5">
-                                <img src={std.avatar} alt={std.name} className="h-7 w-7 rounded-full object-cover border border-white/10" />
-                                <div>
-                                  <p className="font-bold text-xs">{std.name}</p>
+                            <td className="px-4 py-3 font-bold text-slate-400 border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 sticky left-0 z-10 bg-[#0f172a]" style={{ minWidth: '50px', width: '50px', maxWidth: '50px' }}>{idx + 1}</td>
+                            <td className="px-4 py-3 font-semibold text-white  border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 sticky left-[50px] z-10 bg-[#0f172a]" style={{ minWidth: '220px', width: '220px', maxWidth: '220px' }}>
+                              <div className="flex items-center gap-2.5 truncate">
+                                <img src={std.avatar} alt={std.name} className="h-7 w-7 rounded-full object-cover border border-white/10 shrink-0" />
+                                <div className="truncate">
+                                  <p className="font-bold text-xs truncate" title={std.name}>{std.name}</p>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 font-mono text-xs font-semibold border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50">{std.dni}</td>
+                            <td className="px-4 py-3 font-mono text-xs font-semibold border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 sticky left-[270px] z-10 bg-[#0f172a]" style={{ minWidth: '90px', width: '90px', maxWidth: '90px' }}>{std.dni}</td>
 
                             {/* Cells of evaluations */}
-                            {activeEvaluations.map(evalItem => {
+                            {activeEvaluations.map((evalItem, evalIndex) => {
                               const score = getCellScore(std.id, evalItem.id);
+
+                              const columnTone = ['bg-blue-50/45 dark:bg-blue-950/10', 'bg-violet-50/45 dark:bg-violet-950/10', 'bg-cyan-50/45 dark:bg-cyan-950/10', 'bg-emerald-50/45 dark:bg-emerald-950/10'][evalIndex % 4];
+                              let tdClass = `px-2 py-2.5 text-center border border-slate-200 dark:border-slate-800 transition-all duration-150 cursor-pointer hover:opacity-90 ${columnTone}`;
+                              if (score === 'AD') {
+                                tdClass += " cell-grade-ad";
+                              } else if (score === 'A') {
+                                tdClass += " cell-grade-a";
+                              } else if (score === 'B') {
+                                tdClass += " cell-grade-b";
+                              } else if (score === 'C') {
+                                tdClass += " cell-grade-c";
+                              } else if (typeof score === 'number') {
+                                tdClass += " bg-transparent border-kinetic-cyan/50 text-kinetic-cyan dark:text-cyan-400 font-extrabold";
+                              } else {
+                                tdClass += " bg-transparent text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900";
+                              }
 
                               return (
                                 <td
                                   key={evalItem.id}
                                   onClick={() => handleOpenGradingCell(std, evalItem)}
-                                  className="px-2 py-2.5 text-center border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 transition-colors cursor-pointer hover:bg-white/5/25 dark:hover:bg-indigo-950/10"
+                                  className={tdClass}
                                 >
-                                  <span className={
-                                    (score === 'AD' ? 'text-emerald-600 dark:text-emerald-400' :
-                                     score === 'A' ? 'text-cyan-400' :
-                                     score === 'B' ? 'text-amber-500' :
-                                     score === 'C' ? 'text-rose-500' :
-                                     typeof score === 'number' && score >= (gradingScale === '20' ? 11.0 : 6.0) ? 'text-kinetic-cyan' :
-                                     typeof score === 'number' && score < (gradingScale === '20' ? 11.0 : 6.0) ? 'text-rose-500' : 'text-slate-400') +" font-black text-base"
-                                  }>
+                                  <span className="font-black text-xl">
                                     {score}
                                   </span>
                                 </td>
@@ -2243,19 +2389,29 @@ function GradingPortal({
                             )}
 
                             {/* Overall average */}
-                            <td className="px-3 py-2.5 text-center border border-kinetic-cyan/50 shadow-[0_0_8px_rgba(99,102,241,0.1)] dark:border-kinetic-cyan/50 bg-white/5 dark:bg-indigo-950/5">
-                              <span className={`px-3.5 py-1.5 rounded-lg text-sm font-black ${
-                                finalAvg === 'AD' ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                                finalAvg === 'A' ? 'bg-white/5 text-cyan-400 bg-white/5 dark:text-cyan-200' :
-                                finalAvg === 'B' ? 'bg-amber-500/10 text-amber-700 dark:bg-amber-950/40' :
-                                finalAvg === 'C' ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-950/40' :
-                                typeof finalAvg === 'number' && finalAvg >= (gradingScale === '20' ? 11.0 : 6.0) ? 'bg-white/5 text-cyan-400 bg-white/5' :
-                                typeof finalAvg === 'number' && finalAvg < (gradingScale === '20' ? 11.0 : 6.0) ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-950/40' :
-                                'bg-white/5 text-slate-400'
-                              }`}>
-                                {finalAvg}
-                              </span>
-                            </td>
+                            {(() => {
+                              let avgTdClass = "px-3 py-2.5 text-center border border-slate-200 dark:border-slate-800 transition-all duration-150";
+                              if (finalAvg === 'AD') {
+                                avgTdClass += " cell-grade-ad";
+                              } else if (finalAvg === 'A') {
+                                avgTdClass += " cell-grade-a";
+                              } else if (finalAvg === 'B') {
+                                avgTdClass += " cell-grade-b";
+                              } else if (finalAvg === 'C') {
+                                avgTdClass += " cell-grade-c";
+                              } else if (typeof finalAvg === 'number') {
+                                avgTdClass += " bg-transparent border-kinetic-cyan/50 text-kinetic-cyan dark:text-cyan-400 font-extrabold";
+                              } else {
+                                avgTdClass += " bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500";
+                              }
+                              return (
+                                <td className={avgTdClass}>
+                                  <span className="text-xl font-black">
+                                    {finalAvg}
+                                  </span>
+                                </td>
+                              );
+                            })()}
                           </tr>
                         );
                       })
@@ -3056,6 +3212,8 @@ function GradingPortal({
                                   <option value="direct">Calificación Directa (✓/✗)</option>
                                   <option value="choice">Opción Múltiple (Alternativas con Clave)</option>
                                   <option value="matching">Relacionar Columnas (Subpreguntas)</option>
+                                  <option value="abc">Escala A/B/C (Total/Mitad/Cero)</option>
+                                  <option value="numeric">Puntaje Manual (Ingreso Libre)</option>
                                 </select>
                               ) : (
                                 <span className="text-[11px] font-bold text-slate-400 bg-white/10   px-2 py-1 rounded-md border border-white/10/40">
@@ -3374,6 +3532,8 @@ function GradingPortal({
                                             <option value="direct">Calificación Directa (✓/✗)</option>
                                             <option value="choice">Opción Múltiple</option>
                                             <option value="matching">Relacionar Columnas</option>
+                                            <option value="abc">Escala A/B/C (Total/Mitad/Cero)</option>
+                                            <option value="numeric">Puntaje Manual (Ingreso Libre)</option>
                                           </select>
                                         </div>
                                       </div>
@@ -3708,7 +3868,7 @@ function GradingPortal({
             {/* Two-Panel Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch relative z-10 text-slate-200">
               {/* Left Panel: Resumen de Calificaciones */}
-              <aside className="col-span-12 lg:col-span-3 flex flex-col justify-between p-5 bg-gradient-to-b from-white to-slate-50 rounded-2xl border border-kinetic-cyan/30 shadow-lg shadow-indigo-500/10 min-h-[300px]">
+              <aside className="col-span-12 lg:col-span-3 flex flex-col justify-between p-5 bg-[#131B2F] rounded-2xl border border-kinetic-cyan/30 shadow-lg shadow-indigo-500/10 min-h-[300px]">
                 <div className="space-y-6 w-full">
                   <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-white/10/60 pb-2">Resumen de Calificaciones <span className="text-[8.5px] font-normal text-slate-400 block mt-1">(Tiempo Real)</span></h3>
                   <div className="grid grid-cols-2 lg:grid-cols-1 gap-6 justify-items-center">
@@ -3822,14 +3982,59 @@ function GradingPortal({
                   <span className="text-xs text-slate-400 font-bold">Actividad: <strong className="text-purple-650">{gradingEval.name}</strong> ({gradingEval.type})</span>
                 </div>
                 <div className="space-y-4 max-h-[62vh] overflow-y-auto pr-1 custom-scrollbar">
-                  {gradingEval.type === 'Examen' && (() => {
+                  {(gradingEval.type === 'Examen' || gradingEval.type === 'Práctica' || gradingEval.type === 'Practica') && (() => {
                 const config = gradingEval.instrumentConfig || {};
                 const questions = config.questions || [];
                 
-                // Si es un examen legado (vacío de configuración), mostramos la Ficha de"El Dedo Mágico"
+                // Si es un examen legado (vacío de configuración), mostramos la Ficha de "El Dedo Mágico" o "Mito de la Sachamama"
                 if (questions.length === 0) {
+                  const selectedTemplate = tempExamSelections?.selectedTemplate || (gradingEval.name?.toLowerCase().includes('sachamama') || gradingEval.name?.toLowerCase().includes('mit') ? 'mito' : 'dedo');
+                  const isMito = selectedTemplate === 'mito';
+
+                  const renderTemplateSelector = () => (
+                    <div className="flex items-center gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800 justify-between mb-4 max-w-xl mx-auto">
+                      <span className="text-xs font-bold text-slate-400">Plantilla de Ficha Interactiva:</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTempExamSelections(prev => ({ ...prev, selectedTemplate: 'dedo' }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                            selectedTemplate === 'dedo'
+                              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-sm shadow-indigo-500/10'
+                              : 'bg-slate-900/40 text-slate-500 border border-slate-800 hover:text-slate-400'
+                          }`}
+                        >
+                          El Dedo Mágico
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTempExamSelections(prev => ({ ...prev, selectedTemplate: 'mito' }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                            selectedTemplate === 'mito'
+                              ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40 shadow-sm shadow-teal-500/10'
+                              : 'bg-slate-900/40 text-slate-500 border border-slate-800 hover:text-slate-400'
+                          }`}
+                        >
+                          Mito de la Sachamama
+                        </button>
+                      </div>
+                    </div>
+                  );
+
+                  if (isMito) {
+                    return (
+                      <div className="space-y-4">
+                        {renderTemplateSelector()}
+                        <MitoSachamamaFicha
+                          tempExamSelections={tempExamSelections}
+                          setTempExamSelections={setTempExamSelections}
+                        />
+                      </div>
+                    );
+                  }
                   return (
                     <div className="space-y-5 max-w-xl mx-auto py-2">
+                      {renderTemplateSelector()}
                       <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 border-none text-white flex items-center justify-between shadow-xl shadow-indigo-500/30">
                         <div>
                           <h4 className="text-xs font-black text-slate-200">
@@ -4111,7 +4316,7 @@ function GradingPortal({
                 questions.forEach(q => {
                   const pts = parseFloat(q.points) || 0;
                   totalMaxPoints += pts;
-                  if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
+                  if (hasNestedSubquestions(q) && q.subQuestions && q.subQuestions.length > 0) {
                     const subQs = q.subQuestions;
                     const subQPts = pts / subQs.length;
                     const qSelections = tempExamSelections[q.id] || {};
@@ -4121,6 +4326,18 @@ function GradingPortal({
                       if (subQ.type === 'choice') {
                         if (selectedVal === subQ.correctValue) {
                           obtainedPoints += subQPts;
+                        }
+                      } else if (subQ.type === 'abc') {
+                        if (selectedVal === 'A') {
+                          obtainedPoints += subQPts;
+                        } else if (selectedVal === 'B') {
+                          obtainedPoints += subQPts / 2;
+                        } else if (selectedVal === 'C') {
+                          obtainedPoints += 0;
+                        }
+                      } else if (subQ.type === 'numeric') {
+                        if (selectedVal !== undefined && selectedVal !== null && !isNaN(selectedVal)) {
+                          obtainedPoints += Number(selectedVal);
                         }
                       } else if (subQ.type === 'matching') {
                         const subMatchQs = subQ.subQuestions || [];
@@ -4151,6 +4368,19 @@ function GradingPortal({
                           obtainedPoints += subQPts;
                         }
                       });
+                    } else if (q.type === 'abc') {
+                      if (tempExamSelections[q.id] === 'A') {
+                        obtainedPoints += pts;
+                      } else if (tempExamSelections[q.id] === 'B') {
+                        obtainedPoints += pts / 2;
+                      } else if (tempExamSelections[q.id] === 'C') {
+                        obtainedPoints += 0;
+                      }
+                    } else if (q.type === 'numeric') {
+                      const val = tempExamSelections[q.id];
+                      if (val !== undefined && val !== null && !isNaN(val)) {
+                        obtainedPoints += Number(val);
+                      }
                     } else {
                       if (tempExamSelections[q.id] === true) {
                         obtainedPoints += pts;
@@ -4187,9 +4417,12 @@ function GradingPortal({
                     <div className="space-y-4">
                       {questions.map((q, idx) => {
                         const selectedVal = tempExamSelections[q.id];
-                        const isDirect = q.type === 'direct';
+                        const isDirect = q.type === 'direct' || !q.type;
                         const isChoice = q.type === 'choice';
                         const isMatching = q.type === 'matching';
+                        const isAbc = q.type === 'abc';
+                        const isNumeric = q.type === 'numeric';
+                        const isSubquestionContainer = hasNestedSubquestions(q);
 
                         return (
                           <div key={q.id} className="p-4 bg-transparent  rounded-2xl border border-kinetic-cyan/50 dark:border-kinetic-cyan/40 space-y-3.5">
@@ -4205,7 +4438,7 @@ function GradingPortal({
                               </span>
                             </div>
 
-                            {!q.hasSubQuestions && isDirect && (
+                            {!isSubquestionContainer && isDirect && (
                               <div className="grid grid-cols-2 gap-3.5">
                                 <button
                                   type="button"
@@ -4242,7 +4475,59 @@ function GradingPortal({
                               </div>
                             )}
 
-                            {!q.hasSubQuestions && isChoice && (
+                            {!isSubquestionContainer && isAbc && (
+                              <div className="grid grid-cols-3 gap-3.5">
+                                {[
+                                  { val: 'A', label: 'A (Correcta)', pts: q.points },
+                                  { val: 'B', label: 'B (Medio)', pts: q.points / 2 },
+                                  { val: 'C', label: 'C (Malo)', pts: 0 }
+                                ].map(opt => (
+                                  <button
+                                    key={opt.val}
+                                    type="button"
+                                    onClick={() => {
+                                      setTempExamSelections(prev => ({
+                                        ...prev,
+                                        [q.id]: selectedVal === opt.val ? null : opt.val
+                                      }));
+                                    }}
+                                    className={`py-2 px-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition active:scale-95 font-black text-[11px] ${
+                                      selectedVal === opt.val
+                                        ? 'bg-gradient-to-r from-violet-500 to-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/40 ring-2 ring-indigo-500/30'
+                                        : 'bg-white/5 text-slate-400 border-white/10/80 hover:bg-white/10'
+                                    }`}
+                                  >
+                                    <span>{opt.label}</span>
+                                    <span className="text-[9px] font-medium opacity-80">(+{opt.pts} pts)</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {!isSubquestionContainer && isNumeric && (
+                              <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                                <span className="text-[11px] font-bold text-slate-300">Puntaje asignado:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={q.points}
+                                  step="any"
+                                  value={selectedVal !== undefined && selectedVal !== null ? selectedVal : ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setTempExamSelections(prev => ({
+                                      ...prev,
+                                      [q.id]: val === '' ? null : Number(val)
+                                    }));
+                                  }}
+                                  className="w-24 rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-sm font-black text-cyan-400 focus:bg-transparent focus:border-kinetic-cyan transition outline-none"
+                                  placeholder={`Máx: ${q.points}`}
+                                />
+                                <span className="text-[10px] text-slate-400 font-bold">/ {q.points} pts</span>
+                              </div>
+                            )}
+
+                            {!isSubquestionContainer && isChoice && (
                               <div className="grid grid-cols-1 gap-2 text-[11px] font-semibold">
                                 {(q.options || []).map(opt => {
                                   const isSelected = selectedVal === opt.id;
@@ -4288,7 +4573,7 @@ function GradingPortal({
                               </div>
                             )}
 
-                            {!q.hasSubQuestions && isMatching && (
+                            {!isSubquestionContainer && isMatching && (
                               <div className="border border-slate-155  rounded-lg overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80">
                                 {(q.subQuestions || []).map((subQ, sIdx) => {
                                   const qSelections = selectedVal || {};
@@ -4354,13 +4639,15 @@ function GradingPortal({
                             )}
 
                             {/* Subpreguntas Jerárquicas Anidadas */}
-                            {q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0 && (
+                            {isSubquestionContainer && q.subQuestions && q.subQuestions.length > 0 && (
                               <div className="space-y-4 pt-1">
                                 {q.subQuestions.map((subQ, sIdx) => {
                                   const subQSelectedVal = selectedVal?.[subQ.id];
-                                  const isSubDirect = subQ.type === 'direct';
+                                  const isSubDirect = subQ.type === 'direct' || !subQ.type;
                                   const isSubChoice = subQ.type === 'choice';
                                   const isSubMatching = subQ.type === 'matching';
+                                  const isSubAbc = subQ.type === 'abc';
+                                  const isSubNumeric = subQ.type === 'numeric';
                                   const subQPts = (q.points / q.subQuestions.length).toFixed(1);
 
                                   return (
@@ -4413,6 +4700,59 @@ function GradingPortal({
                                           >
                                             <span>✗</span> Incorrecto
                                           </button>
+                                        </div>
+                                      )}
+
+                                      {isSubAbc && (
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {[
+                                            { val: 'A', label: 'A (C)', pts: subQPts },
+                                            { val: 'B', label: 'B (M)', pts: (subQPts / 2).toFixed(1) },
+                                            { val: 'C', label: 'C (I)', pts: 0 }
+                                          ].map(opt => (
+                                            <button
+                                              key={opt.val}
+                                              type="button"
+                                              onClick={() => {
+                                                setTempExamSelections(prev => {
+                                                  const qSel = { ...(prev[q.id] || {}) };
+                                                  qSel[subQ.id] = subQSelectedVal === opt.val ? null : opt.val;
+                                                  return { ...prev, [q.id]: qSel };
+                                                });
+                                              }}
+                                              className={`py-1.5 px-2 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition active:scale-95 font-bold text-[9.5px] ${
+                                                subQSelectedVal === opt.val
+                                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-[0_0_8px_rgba(99,102,241,0.3)]'
+                                                  : 'bg-transparent text-slate-400 border-white/10 hover:bg-white/10'
+                                              }`}
+                                            >
+                                              <span>{opt.label}</span>
+                                              <span className="text-[8px] opacity-80">(+{opt.pts})</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {isSubNumeric && (
+                                        <div className="flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10 shadow-[0_0_8px_rgba(99,102,241,0.05)]">
+                                          <span className="text-[10px] font-bold text-slate-300">Puntaje:</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={subQPts}
+                                            step="any"
+                                            value={subQSelectedVal !== undefined && subQSelectedVal !== null ? subQSelectedVal : ''}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setTempExamSelections(prev => {
+                                                const qSel = { ...(prev[q.id] || {}) };
+                                                qSel[subQ.id] = val === '' ? null : Number(val);
+                                                return { ...prev, [q.id]: qSel };
+                                              });
+                                            }}
+                                            className="w-16 rounded border border-white/10 bg-black/20 px-2 py-1 text-xs font-bold text-cyan-400 focus:bg-transparent focus:border-cyan-500 transition outline-none"
+                                            placeholder={`Máx ${subQPts}`}
+                                          />
                                         </div>
                                       )}
 
@@ -5307,6 +5647,25 @@ function GradingPortal({
                     )}
                   </div>
                 </label>
+                {String(copyingEvaluation.unit ?? selectedUnit) === '2' && (
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none font-bold text-xs pt-3 mt-3 border-t border-white/10">
+                    <input
+                      type="checkbox"
+                      checked={copyToFormativeOption}
+                      onChange={(e) => {
+                        setCopyToFormativeOption(e.target.checked);
+                        if (e.target.checked && sameClassSelected) setCopyGradesOption(true);
+                      }}
+                      className="rounded h-4 w-4 text-kinetic-cyan focus:ring-kinetic-cyan mt-0.5"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-white font-extrabold">Copiar a Calificaciones Formativas</span>
+                      <span className="text-[10px] text-slate-300 font-semibold block leading-tight mt-1">
+                        Exclusivo de la Unidad 2. Crea una copia del instrumento y conserva sus calificativos; la columna oficial original no se mueve ni desaparece.
+                      </span>
+                    </div>
+                  </label>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 border-t border-white/10 pt-4">

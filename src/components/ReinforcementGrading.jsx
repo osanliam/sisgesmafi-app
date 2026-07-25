@@ -1,5 +1,6 @@
 import React, { useState, useContext, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import MitoSachamamaFicha, { getMitoScore } from './MitoSachamamaFicha';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { 
   Award, 
@@ -28,6 +29,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import axios from 'axios';
+import { canViewEvaluation } from '../utils/evaluationAccess';
 
 function ReinforcementGrading({
   embeddedCourseId,
@@ -462,11 +464,11 @@ function ReinforcementGrading({
            (selectedSection || '').trim().toLowerCase() === (targetSection || '').trim().toLowerCase();
   }, [selectedGrade, targetGrade, selectedSection, targetSection]);
 
-  const handleCopyEvaluationSubmit = (e) => {
+  const handleCopyEvaluationSubmit = async (e) => {
     e.preventDefault();
     if (!copyingEvaluation) return;
     
-    const success = copyEvaluation(
+    const success = await copyEvaluation(
       copyingEvaluation.id,
       targetCourseId,
       targetCompetenceId,
@@ -506,12 +508,13 @@ function ReinforcementGrading({
   // Filtrar evaluaciones de refuerzo del periodo/competencia/curso seleccionados
   const activeReinforcementEvaluations = useMemo(() => {
     return evaluations.filter(e => 
+      canViewEvaluation(e, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
       e.courseId === selectedCourseId &&
       e.competenceId === selectedCompetenceId &&
       (e.bimester || '1') === selectedBimester &&
       e.isReinforcement === true
     );
-  }, [evaluations, selectedCourseId, selectedCompetenceId, selectedBimester]);
+  }, [evaluations, selectedCourseId, selectedCompetenceId, selectedBimester, currentRole, currentUser, selectedSection]);
 
   // Conversor de letras CNEB a valores numéricos
   const letterToValue = (letter) => {
@@ -533,6 +536,7 @@ function ReinforcementGrading({
     if (!selectedCourseId || !selectedCompetenceId) return '-';
     
     const courseEvals = evaluations.filter(ev => 
+      canViewEvaluation(ev, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
       ev.courseId === selectedCourseId &&
       ev.competenceId === selectedCompetenceId &&
       (ev.bimester || '1') === selectedBimester &&
@@ -724,6 +728,9 @@ function ReinforcementGrading({
       competenceId: selectedCompetenceId,
       capacityId: newEvalCapacityId || null,
       bimester: selectedBimester,
+      section: selectedSection === 'Todas' ? null : selectedSection,
+      sections: selectedSection === 'Todas' ? [] : [selectedSection],
+      gradeLevel: selectedGrade === 'Todas' ? null : selectedGrade,
       name: newEvalName.trim(),
       type: newEvalType,
       isReinforcement: true,
@@ -750,6 +757,9 @@ function ReinforcementGrading({
       courseId: selectedCourseId,
       competenceId: selectedCompetenceId,
       bimester: selectedBimester,
+      section: selectedSection === 'Todas' ? null : selectedSection,
+      sections: selectedSection === 'Todas' ? [] : [selectedSection],
+      gradeLevel: selectedGrade === 'Todas' ? null : selectedGrade,
       name:"Examen de Recuperación 1",
       type:"Examen",
       isReinforcement: true,
@@ -760,6 +770,9 @@ function ReinforcementGrading({
       courseId: selectedCourseId,
       competenceId: selectedCompetenceId,
       bimester: selectedBimester,
+      section: selectedSection === 'Todas' ? null : selectedSection,
+      sections: selectedSection === 'Todas' ? [] : [selectedSection],
+      gradeLevel: selectedGrade === 'Todas' ? null : selectedGrade,
       name:"Portafolio de Tareas de Refuerzo",
       type:"Lista de Cotejo",
       isReinforcement: true,
@@ -867,7 +880,7 @@ function ReinforcementGrading({
     }
 
     if (match && match.details) {
-      if (evaluation.type === 'Examen') {
+      if (evaluation.type === 'Examen' || evaluation.type === 'Práctica' || evaluation.type === 'Practica') {
         setTempExamScore(match.score);
         setTempExamSelections(match.details.examSelections || {});
       } else if (evaluation.type === 'Rubrica') {
@@ -881,7 +894,7 @@ function ReinforcementGrading({
         setTempObsComments(match.details.obsComments || '');
       }
     } else if (match && match.score !== undefined && match.score !== '') {
-      if (evaluation.type === 'Examen') {
+      if (evaluation.type === 'Examen' || evaluation.type === 'Práctica' || evaluation.type === 'Practica') {
         setTempExamScore(match.score);
         setTempExamSelections({});
       } else {
@@ -902,83 +915,118 @@ function ReinforcementGrading({
     const isLiteral = gradingScale === 'literal';
     if (!gradingEval) return"";
 
-    if (gradingEval.type === 'Examen') {
-      const questions = gradingEval.instrumentConfig?.questions || [];
+    if (gradingEval.type === 'Examen' || gradingEval.type === 'Práctica' || gradingEval.type === 'Practica') {
+      const isMito = gradingEval.name?.toLowerCase().includes('mit') || gradingEval.name?.toLowerCase().includes('sachamama');
       
       // Check if there are any selections in tempExamSelections
-      const hasSelections = Object.values(tempExamSelections).some(v => {
+      const hasSelections = Object.values(tempExamSelections || {}).some(v => {
         if (typeof v === 'object' && v !== null) {
           return Object.values(v).some(val => val !== undefined && val !== null && val !== '');
         }
         return v !== undefined && v !== null && v !== '';
       });
-      if (!hasSelections) return"";
+      if (!hasSelections) return "";
 
       let ratio = 0;
-      if (questions.length > 0) {
-        let obtainedPoints = 0;
-        let totalMaxPoints = 0;
-        questions.forEach(q => {
-          const points = parseFloat(q.points) || 0;
-          totalMaxPoints += points;
-          if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
-            const subQs = q.subQuestions;
-            const subQPts = points / subQs.length;
-            const qSelections = tempExamSelections[q.id] || {};
-            
-            subQs.forEach(subQ => {
-              const selectedVal = qSelections[subQ.id];
-              if (subQ.type === 'choice') {
-                if (selectedVal === subQ.correctValue) {
-                  obtainedPoints += subQPts;
-                }
-              } else if (subQ.type === 'matching') {
-                const subMatchQs = subQ.subQuestions || [];
-                const matchQPts = subMatchQs.length > 0 ? (subQPts / subMatchQs.length) : 0;
-                const matchSelections = selectedVal || {};
-                subMatchQs.forEach(mQ => {
-                  if (matchSelections[mQ.id] === mQ.correctValue) {
-                    obtainedPoints += matchQPts;
-                  }
-                });
-              } else { // direct
-                if (selectedVal === true) {
-                  obtainedPoints += subQPts;
-                }
-              }
-            });
-          } else {
-            if (q.type === 'choice') {
-              if (tempExamSelections[q.id] === q.correctValue) {
-                obtainedPoints += points;
-              }
-            } else if (q.type === 'matching') {
-              const subQs = q.subQuestions || [];
-              const subQPts = subQs.length > 0 ? (points / subQs.length) : 0;
+      if (isMito) {
+        const score = getMitoScore(tempExamSelections);
+        ratio = score / 20;
+      } else {
+        const questions = gradingEval.instrumentConfig?.questions || [];
+        if (questions.length > 0) {
+          let obtainedPoints = 0;
+          let totalMaxPoints = 0;
+          questions.forEach(q => {
+            const points = parseFloat(q.points) || 0;
+            totalMaxPoints += points;
+            if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
+              const subQs = q.subQuestions;
+              const subQPts = points / subQs.length;
               const qSelections = tempExamSelections[q.id] || {};
+              
               subQs.forEach(subQ => {
-                if (qSelections[subQ.id] === subQ.correctValue) {
-                  obtainedPoints += subQPts;
+                const selectedVal = qSelections[subQ.id];
+                if (subQ.type === 'choice') {
+                  if (selectedVal === subQ.correctValue) {
+                    obtainedPoints += subQPts;
+                  }
+                } else if (subQ.type === 'abc') {
+                  if (selectedVal === 'A') {
+                    obtainedPoints += subQPts;
+                  } else if (selectedVal === 'B') {
+                    obtainedPoints += subQPts / 2;
+                  }
+                } else if (subQ.type === 'numeric') {
+                  if (selectedVal !== undefined && selectedVal !== null && !isNaN(selectedVal)) {
+                    obtainedPoints += Number(selectedVal);
+                  }
+                } else if (subQ.type === 'matching') {
+                  const subMatchQs = subQ.subQuestions || [];
+                  const matchQPts = subMatchQs.length > 0 ? (subQPts / subMatchQs.length) : 0;
+                  const matchSelections = selectedVal || {};
+                  subMatchQs.forEach(mQ => {
+                    if (matchSelections[mQ.id] === mQ.correctValue) {
+                      obtainedPoints += matchQPts;
+                    }
+                  });
+                } else { // direct
+                  if (selectedVal === true) {
+                    obtainedPoints += subQPts;
+                  }
                 }
               });
-            } else { // direct
-              if (tempExamSelections[q.id] === true) {
-                obtainedPoints += points;
+            } else {
+              if (q.type === 'choice') {
+                if (tempExamSelections[q.id] === q.correctValue) {
+                  obtainedPoints += points;
+                }
+              } else if (q.type === 'matching') {
+                const subQs = q.subQuestions || [];
+                const subQPts = subQs.length > 0 ? (points / subQs.length) : 0;
+                const qSelections = tempExamSelections[q.id] || {};
+                subQs.forEach(subQ => {
+                  if (qSelections[subQ.id] === subQ.correctValue) {
+                    obtainedPoints += subQPts;
+                  }
+                });
+              } else if (q.type === 'abc') {
+                const selectedVal = tempExamSelections[q.id];
+                if (selectedVal === 'A') {
+                  obtainedPoints += points;
+                } else if (selectedVal === 'B') {
+                  obtainedPoints += points / 2;
+                }
+              } else if (q.type === 'numeric') {
+                const selectedVal = tempExamSelections[q.id];
+                if (selectedVal !== undefined && selectedVal !== null && !isNaN(selectedVal)) {
+                  obtainedPoints += Number(selectedVal);
+                }
+              } else { // direct
+                if (tempExamSelections[q.id] === true) {
+                  obtainedPoints += points;
+                }
               }
             }
-          }
-        });
-        ratio = totalMaxPoints > 0 ? (obtainedPoints / totalMaxPoints) : 0;
-      } else {
-        // Fallback legado"El Dedo Mágico"
-        const score = getExamScore(tempExamSelections);
-        ratio = score / 20;
+          });
+          ratio = totalMaxPoints > 0 ? (obtainedPoints / totalMaxPoints) : 0;
+        } else {
+          const score = getExamScore(tempExamSelections);
+          ratio = score / 20;
+        }
       }
 
       if (isLiteral) {
-        if (ratio >= 0.75) return 'A';
-        if (ratio >= 0.40) return 'B';
-        return 'C';
+        const maxGradeScale = gradingEval.maxGradeScale || ((gradingEval.type === 'Rúbrica' || gradingEval.type === 'Rubrica') ? 'AD' : 'A');
+        if (maxGradeScale === 'AD') {
+          if (ratio >= 0.87) return 'AD';
+          if (ratio >= 0.62) return 'A';
+          if (ratio >= 0.37) return 'B';
+          return 'C';
+        } else {
+          if (ratio >= 0.84) return 'A';
+          if (ratio >= 0.50) return 'B';
+          return 'C';
+        }
       } else {
         const scaleVal = gradingScale === '20' ? 20 : 10;
         return parseFloat((ratio * scaleVal));
@@ -1045,9 +1093,17 @@ function ReinforcementGrading({
       const avg = ratio * 3;
 
       if (isLiteral) {
-        if (avg >= 2.5) return 'A';
-        if (avg >= 1.5) return 'B';
-        return 'C';
+        const maxGradeScale = gradingEval.maxGradeScale || ((gradingEval.type === 'Rúbrica' || gradingEval.type === 'Rubrica') ? 'AD' : 'A');
+        if (maxGradeScale === 'AD') {
+          if (ratio >= 0.87) return 'AD';
+          if (ratio >= 0.62) return 'A';
+          if (ratio >= 0.37) return 'B';
+          return 'C';
+        } else {
+          if (ratio >= 0.84) return 'A';
+          if (ratio >= 0.50) return 'B';
+          return 'C';
+        }
       } else {
         const scaleVal = gradingScale === '20' ? 20 : 10;
         return parseFloat((ratio * scaleVal).toFixed(2));
@@ -1071,9 +1127,17 @@ function ReinforcementGrading({
       const ratio = yesCount / items.length;
 
       if (isLiteral) {
-        if (ratio >= 0.75) return 'A';
-        if (ratio >= 0.40) return 'B';
-        return 'C';
+        const maxGradeScale = gradingEval.maxGradeScale || ((gradingEval.type === 'Rúbrica' || gradingEval.type === 'Rubrica') ? 'AD' : 'A');
+        if (maxGradeScale === 'AD') {
+          if (ratio >= 0.87) return 'AD';
+          if (ratio >= 0.62) return 'A';
+          if (ratio >= 0.37) return 'B';
+          return 'C';
+        } else {
+          if (ratio >= 0.84) return 'A';
+          if (ratio >= 0.50) return 'B';
+          return 'C';
+        }
       } else {
         const scaleVal = gradingScale === '20' ? 20 : 10;
         return parseFloat((ratio * scaleVal));
@@ -1174,33 +1238,34 @@ function ReinforcementGrading({
   };
 
   const handleNavToPreviousStudent = () => {
-    if (students.length === 0) return;
+    if (visibleStudentsList.length === 0) return;
     handleSaveCurrentStudentGradeSilent();
 
-    const currentIndex = students.findIndex(s => s.id === gradingStudent.id);
+    const currentIndex = visibleStudentsList.findIndex(s => s.id === gradingStudent.id);
     let prevIndex = currentIndex - 1;
     if (prevIndex < 0) {
-      prevIndex = students.length - 1;
+      prevIndex = visibleStudentsList.length - 1;
     }
-    const prevStudent = students[prevIndex];
+    const prevStudent = visibleStudentsList[prevIndex];
     handleOpenGradingCell(prevStudent, gradingEval);
   };
 
   const handleNavToNextStudent = () => {
-    if (students.length === 0) return;
+    if (visibleStudentsList.length === 0) return;
     handleSaveCurrentStudentGradeSilent();
 
-    const currentIndex = students.findIndex(s => s.id === gradingStudent.id);
+    const currentIndex = visibleStudentsList.findIndex(s => s.id === gradingStudent.id);
     let nextIndex = currentIndex + 1;
-    if (nextIndex >= students.length) {
+    if (nextIndex >= visibleStudentsList.length) {
       nextIndex = 0;
     }
-    const nextStudent = students[nextIndex];
+    const nextStudent = visibleStudentsList[nextIndex];
     handleOpenGradingCell(nextStudent, gradingEval);
   };
 
   const getCompetenceAverage = (studentId, competenceId) => {
     const compEvals = evaluations.filter(e =>
+      canViewEvaluation(e, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
       e.courseId === selectedCourseId &&
       e.competenceId === competenceId &&
       (e.bimester || '1') === selectedBimester &&
@@ -1227,6 +1292,7 @@ function ReinforcementGrading({
 
   const getCompetenceReinforcementAverage = (studentId, competenceId) => {
     const reinfEvals = evaluations.filter(e =>
+      canViewEvaluation(e, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
       e.courseId === selectedCourseId &&
       e.competenceId === competenceId &&
       (e.bimester || '1') === selectedBimester &&
@@ -1579,7 +1645,7 @@ function ReinforcementGrading({
             }
             // For reinforcement, show the specific competence being worked on
             return (
-              <div className="overflow-x-auto rounded-2xl border border-white/10  overflow-hidden">
+              <div className="overflow-x-auto rounded-lg border border-white/10  overflow-hidden">
                 <table className="w-full border-collapse text-left text-sm text-slate-400">
                   <thead className="bg-white/10 text-xs font-bold uppercase text-slate-200">
                     <tr>
@@ -1623,6 +1689,7 @@ function ReinforcementGrading({
                           <td className="px-3 py-3 font-mono text-xs font-semibold border border-white/10  text-center">{std.dni}</td>
                           {competencies.map(comp => {
                             const compEvals = evaluations.filter(e =>
+                              canViewEvaluation(e, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
                               e.courseId === selectedCourseId &&
                               e.competenceId === comp.id &&
                               (e.bimester || '1') === selectedBimester &&
@@ -1634,6 +1701,7 @@ function ReinforcementGrading({
                             }).filter(s => s !== null && s !== '');
 
                             const reinfEvals = evaluations.filter(e =>
+                              canViewEvaluation(e, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
                               e.courseId === selectedCourseId &&
                               e.competenceId === comp.id &&
                               (e.bimester || '1') === selectedBimester &&
@@ -1670,21 +1738,29 @@ function ReinforcementGrading({
                               return parseFloat(reinfAvg) > parseFloat(regAvg) ? reinfAvg : regAvg;
                             })();
 
-                            const gradeClass = (g, highlight) => {
-                              if (g === '-') return 'text-slate-400 font-black text-sm';
-                              if (g === 'AD') return highlight ? 'bg-emerald-500/10 text-emerald-700 font-black px-3 py-1 rounded-lg text-sm' : 'text-emerald-600 font-black text-sm';
-                              if (g === 'A') return highlight ? 'bg-white/5 text-cyan-400 font-black px-3 py-1 rounded-lg text-sm' : 'text-kinetic-cyan font-black text-sm';
-                              if (g === 'B') return highlight ? 'bg-amber-500/10 text-amber-700 font-black px-3 py-1 rounded-lg text-sm' : 'text-amber-555 font-black text-sm';
-                              if (g === 'C') return highlight ? 'bg-rose-500/10 text-rose-700 font-black px-3 py-1 rounded-lg text-sm' : 'text-rose-550 font-black text-sm';
-                              const n = parseFloat(g);
-                              const pass = gradingScale === '20' ? n >= 11.0 : n >= 6.0;
-                              if (pass) return highlight ? 'bg-emerald-500/10 text-emerald-700 font-black px-3 py-1 rounded-lg text-sm' : 'text-emerald-500 font-black text-sm';
-                              return highlight ? 'bg-rose-500/10 text-rose-700 font-black px-3 py-1 rounded-lg text-sm' : 'text-rose-550 font-black text-sm';
-                            };
+                            let tdClass = "px-2 py-2.5 text-center border border-slate-200 dark:border-slate-800 transition-all duration-150";
+                            if (finalGrade === 'AD') {
+                              tdClass += " cell-grade-ad";
+                            } else if (finalGrade === 'A') {
+                              tdClass += " cell-grade-a";
+                            } else if (finalGrade === 'B') {
+                              tdClass += " cell-grade-b";
+                            } else if (finalGrade === 'C') {
+                              tdClass += " cell-grade-c";
+                            } else if (typeof finalGrade === 'number') {
+                              const isPass = gradingScale === '20' ? finalGrade >= 11.0 : finalGrade >= 6.0;
+                              if (isPass) {
+                                tdClass += " bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 font-extrabold";
+                              } else {
+                                tdClass += " bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-extrabold";
+                              }
+                            } else {
+                              tdClass += " bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500";
+                            }
 
                             return (
-                              <td key={comp.id} className="px-2 py-2.5 text-center border border-white/10  bg-emerald-50/5">
-                                <span className={gradeClass(finalGrade, true)}>{finalGrade}</span>
+                              <td key={comp.id} className={tdClass}>
+                                <span className="font-black text-xl">{finalGrade}</span>
                               </td>
                             );
                           })}
@@ -1701,7 +1777,7 @@ function ReinforcementGrading({
             No hay estudiantes de esta sección que requieran refuerzo en la competencia seleccionada.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <div className="overflow-x-auto rounded-lg border border-white/10">
             <table className="w-full border-collapse text-left text-sm text-slate-400">
               <thead className="bg-white/10 text-xs font-bold uppercase text-slate-200">
                 <tr>
@@ -1746,7 +1822,8 @@ function ReinforcementGrading({
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                          <div className="flex gap-1 pt-0.5">
+                          {/* Exportar/Importar Excel — ocultos temporalmente para mantener estética */}
+                          <div className="hidden">
                             <button
                               onClick={() => handleExportEvalGrades(evalItem)}
                               title="Exportar a Excel"
@@ -1793,20 +1870,33 @@ function ReinforcementGrading({
                       {/* Celdas de evaluaciones de refuerzo */}
                       {activeReinforcementEvaluations.map(evalItem => {
                         const score = getReinforcementCellScore(std.id, evalItem.id);
+                        let tdClass = "px-2 py-2.5 text-center border border-slate-200 dark:border-slate-800 transition-all duration-150 cursor-pointer hover:opacity-90";
+                        if (score === 'AD') {
+                          tdClass += " cell-grade-ad";
+                        } else if (score === 'A') {
+                          tdClass += " cell-grade-a";
+                        } else if (score === 'B') {
+                          tdClass += " cell-grade-b";
+                        } else if (score === 'C') {
+                          tdClass += " cell-grade-c";
+                        } else if (typeof score === 'number') {
+                          const isPass = gradingScale === '20' ? score >= 11.0 : score >= 6.0;
+                          if (isPass) {
+                            tdClass += " bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 font-extrabold";
+                          } else {
+                            tdClass += " bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-extrabold";
+                          }
+                        } else {
+                          tdClass += " bg-transparent text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900";
+                        }
+
                         return (
                           <td
                             key={evalItem.id}
                             onClick={() => handleOpenGradingCell(std, evalItem)}
-                            className="px-2 py-2.5 text-center border border-white/10  transition-colors cursor-pointer hover:bg-white/5/25 dark:hover:bg-indigo-950/10"
+                            className={tdClass}
                           >
-                            <span className={
-                              (score === 'AD' ? 'text-emerald-600 dark:text-emerald-400' :
-                               score === 'A' ? 'text-cyan-400' :
-                               score === 'B' ? 'text-amber-500' :
-                               score === 'C' ? 'text-rose-500' :
-                               typeof score === 'number' && score >= (gradingScale === '20' ? 11.0 : 6.0) ? 'text-kinetic-cyan' :
-                               typeof score === 'number' && score < (gradingScale === '20' ? 11.0 : 6.0) ? 'text-rose-500' : 'text-slate-400') +" font-black text-base"
-                            }>
+                            <span className="font-black text-xl">
                               {score}
                             </span>
                           </td>
@@ -1820,19 +1910,34 @@ function ReinforcementGrading({
                       )}
 
                       {/* Promedio resultante de refuerzo */}
-                      <td className="px-3 py-2.5 text-center border border-white/10  bg-violet-50/20 dark:bg-violet-950/5">
-                        <span className={`px-3.5 py-1.5 rounded-lg text-sm font-black ${
-                          reinAvg === 'AD' ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                          reinAvg === 'A' ? 'bg-white/5 text-cyan-400 bg-white/5 dark:text-cyan-200' :
-                          reinAvg === 'B' ? 'bg-amber-500/10 text-amber-700 dark:bg-amber-950/40' :
-                          reinAvg === 'C' ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-950/40' :
-                          typeof reinAvg === 'number' && reinAvg >= (gradingScale === '20' ? 11.0 : 6.0) ? 'bg-white/5 text-cyan-400 bg-white/5' :
-                          typeof reinAvg === 'number' && reinAvg < (gradingScale === '20' ? 11.0 : 6.0) ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-950/40' :
-                          'bg-white/5 text-slate-400'
-                        }`}>
-                          {reinAvg}
-                        </span>
-                      </td>
+                      {(() => {
+                        let avgTdClass = "px-3 py-2.5 text-center border border-slate-200 dark:border-slate-800 transition-all duration-150";
+                        if (reinAvg === 'AD') {
+                          avgTdClass += " cell-grade-ad";
+                        } else if (reinAvg === 'A') {
+                          avgTdClass += " cell-grade-a";
+                        } else if (reinAvg === 'B') {
+                          avgTdClass += " cell-grade-b";
+                        } else if (reinAvg === 'C') {
+                          avgTdClass += " cell-grade-c";
+                        } else if (typeof reinAvg === 'number') {
+                          const isPass = gradingScale === '20' ? reinAvg >= 11.0 : reinAvg >= 6.0;
+                          if (isPass) {
+                            avgTdClass += " bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 font-extrabold";
+                          } else {
+                            avgTdClass += " bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-extrabold";
+                          }
+                        } else {
+                          avgTdClass += " bg-slate-50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500";
+                        }
+                        return (
+                          <td className={avgTdClass}>
+                            <span className="text-xl font-black">
+                              {reinAvg}
+                            </span>
+                          </td>
+                        );
+                      })()}
                     </tr>
                   );
                 })}
@@ -2318,6 +2423,8 @@ function ReinforcementGrading({
                                   <option value="direct">Calificación Directa (✓/✗)</option>
                                   <option value="choice">Opción Múltiple (Alternativas con Clave)</option>
                                   <option value="matching">Relacionar Columnas (Subpreguntas)</option>
+                                  <option value="abc">Escala A/B/C (Total/Mitad/Cero)</option>
+                                  <option value="numeric">Puntaje Manual (Ingreso Libre)</option>
                                 </select>
                               ) : (
                                 <span className="text-[11px] font-bold text-slate-400 bg-white/10   px-2 py-1 rounded-md border border-white/10/40">
@@ -2633,8 +2740,10 @@ function ReinforcementGrading({
                                             className="rounded-lg border border-white/10 bg-transparent px-2 py-0.5 text-[10px] font-bold"
                                           >
                                             <option value="direct">Calificación Directa (✓/✗)</option>
-                                            <option value="choice">Opción Múltiple</option>
-                                            <option value="matching">Relacionar Columnas</option>
+                                            <option value="choice">Opción Múltiple (Alternativas con Clave)</option>
+                                            <option value="matching">Relacionar Columnas (Subpreguntas)</option>
+                                            <option value="abc">Escala A/B/C (Total/Mitad/Cero)</option>
+                                            <option value="numeric">Puntaje Manual (Ingreso Libre)</option>
                                           </select>
                                         </div>
                                       </div>
@@ -3084,14 +3193,59 @@ function ReinforcementGrading({
                   <span className="text-xs text-slate-400 font-bold">Actividad: <strong className="text-purple-650">{gradingEval.name}</strong> ({gradingEval.type})</span>
                 </div>
                 <div className="space-y-4 max-h-[62vh] overflow-y-auto pr-1 custom-scrollbar">
-              {gradingEval.type === 'Examen' && (() => {
+              {(gradingEval.type === 'Examen' || gradingEval.type === 'Práctica' || gradingEval.type === 'Practica') && (() => {
                 const config = gradingEval.instrumentConfig || {};
                 const questions = config.questions || [];
                 
-                // Si es un examen legado (vacío de configuración), mostramos la Ficha de"El Dedo Mágico"
+                // Si es un examen legado (vacío de configuración), mostramos la Ficha de "El Dedo Mágico" o "Mito de la Sachamama"
                 if (questions.length === 0) {
+                  const selectedTemplate = tempExamSelections?.selectedTemplate || (gradingEval.name?.toLowerCase().includes('sachamama') || gradingEval.name?.toLowerCase().includes('mit') ? 'mito' : 'dedo');
+                  const isMito = selectedTemplate === 'mito';
+
+                  const renderTemplateSelector = () => (
+                    <div className="flex items-center gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800 justify-between mb-4 max-w-xl mx-auto">
+                      <span className="text-xs font-bold text-slate-400">Plantilla de Ficha Interactiva:</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTempExamSelections(prev => ({ ...prev, selectedTemplate: 'dedo' }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                            selectedTemplate === 'dedo'
+                              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-sm shadow-indigo-500/10'
+                              : 'bg-slate-900/40 text-slate-500 border border-slate-800 hover:text-slate-400'
+                          }`}
+                        >
+                          El Dedo Mágico
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTempExamSelections(prev => ({ ...prev, selectedTemplate: 'mito' }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                            selectedTemplate === 'mito'
+                              ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40 shadow-sm shadow-teal-500/10'
+                              : 'bg-slate-900/40 text-slate-500 border border-slate-800 hover:text-slate-400'
+                          }`}
+                        >
+                          Mito de la Sachamama
+                        </button>
+                      </div>
+                    </div>
+                  );
+
+                  if (isMito) {
+                    return (
+                      <div className="space-y-4">
+                        {renderTemplateSelector()}
+                        <MitoSachamamaFicha
+                          tempExamSelections={tempExamSelections}
+                          setTempExamSelections={setTempExamSelections}
+                        />
+                      </div>
+                    );
+                  }
                   return (
                     <div className="space-y-5 max-w-xl mx-auto py-2">
+                      {renderTemplateSelector()}
                       <div className="glass-card-ecc border border-white/10 p-4.5 bg-white/5 border-kinetic-cyan/10 flex items-center justify-between">
                         <div>
                           <h4 className="text-xs font-black text-slate-200">
@@ -3383,6 +3537,18 @@ function ReinforcementGrading({
                         if (selectedVal === subQ.correctValue) {
                           obtainedPoints += subQPts;
                         }
+                      } else if (subQ.type === 'abc') {
+                        if (selectedVal === 'A') {
+                          obtainedPoints += subQPts;
+                        } else if (selectedVal === 'B') {
+                          obtainedPoints += subQPts / 2;
+                        } else if (selectedVal === 'C') {
+                          obtainedPoints += 0;
+                        }
+                      } else if (subQ.type === 'numeric') {
+                        if (selectedVal !== undefined && selectedVal !== null && !isNaN(selectedVal)) {
+                          obtainedPoints += Number(selectedVal);
+                        }
                       } else if (subQ.type === 'matching') {
                         const subMatchQs = subQ.subQuestions || [];
                         const matchQPts = subMatchQs.length > 0 ? (subQPts / subMatchQs.length) : 0;
@@ -3412,6 +3578,19 @@ function ReinforcementGrading({
                           obtainedPoints += subQPts;
                         }
                       });
+                    } else if (q.type === 'abc') {
+                      if (tempExamSelections[q.id] === 'A') {
+                        obtainedPoints += pts;
+                      } else if (tempExamSelections[q.id] === 'B') {
+                        obtainedPoints += pts / 2;
+                      } else if (tempExamSelections[q.id] === 'C') {
+                        obtainedPoints += 0;
+                      }
+                    } else if (q.type === 'numeric') {
+                      const val = tempExamSelections[q.id];
+                      if (val !== undefined && val !== null && !isNaN(val)) {
+                        obtainedPoints += Number(val);
+                      }
                     } else {
                       if (tempExamSelections[q.id] === true) {
                         obtainedPoints += pts;
@@ -3448,9 +3627,11 @@ function ReinforcementGrading({
                     <div className="space-y-4">
                       {questions.map((q, idx) => {
                         const selectedVal = tempExamSelections[q.id];
-                        const isDirect = q.type === 'direct';
+                        const isDirect = q.type === 'direct' || !q.type;
                         const isChoice = q.type === 'choice';
                         const isMatching = q.type === 'matching';
+                        const isAbc = q.type === 'abc';
+                        const isNumeric = q.type === 'numeric';
 
                         return (
                           <div key={q.id} className="glass-card-ecc border border-white/10 p-4 space-y-3">
@@ -3499,6 +3680,58 @@ function ReinforcementGrading({
                                 >
                                   <span>✗</span> Incorrecto (+0 pts)
                                 </button>
+                              </div>
+                            )}
+
+                            {!q.hasSubQuestions && isAbc && (
+                              <div className="grid grid-cols-3 gap-3.5">
+                                {[
+                                  { val: 'A', label: 'A (Correcta)', pts: q.points },
+                                  { val: 'B', label: 'B (Medio)', pts: q.points / 2 },
+                                  { val: 'C', label: 'C (Malo)', pts: 0 }
+                                ].map(opt => (
+                                  <button
+                                    key={opt.val}
+                                    type="button"
+                                    onClick={() => {
+                                      setTempExamSelections(prev => ({
+                                        ...prev,
+                                        [q.id]: selectedVal === opt.val ? null : opt.val
+                                      }));
+                                    }}
+                                    className={`py-2 px-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition active:scale-95 font-black text-[11px] ${
+                                      selectedVal === opt.val
+                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-[0_0_15px_rgba(0,0,0,0.5)]'
+                                        : 'bg-white/5 text-slate-400 border-white/10/80 hover:bg-white/10'
+                                    }`}
+                                  >
+                                    <span>{opt.label}</span>
+                                    <span className="text-[9px] font-medium opacity-80">(+{opt.pts} pts)</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {!q.hasSubQuestions && isNumeric && (
+                              <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                                <span className="text-[11px] font-bold text-slate-300">Puntaje asignado:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={q.points}
+                                  step="any"
+                                  value={selectedVal !== undefined && selectedVal !== null ? selectedVal : ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setTempExamSelections(prev => ({
+                                      ...prev,
+                                      [q.id]: val === '' ? null : Number(val)
+                                    }));
+                                  }}
+                                  className="w-24 rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-sm font-black text-cyan-400 focus:bg-transparent focus:border-kinetic-cyan transition outline-none"
+                                  placeholder={`Máx: ${q.points}`}
+                                />
+                                <span className="text-[10px] text-slate-400 font-bold">/ {q.points} pts</span>
                               </div>
                             )}
 
@@ -3618,9 +3851,11 @@ function ReinforcementGrading({
                               <div className="space-y-4 pt-1">
                                 {q.subQuestions.map((subQ, sIdx) => {
                                   const subQSelectedVal = selectedVal?.[subQ.id];
-                                  const isSubDirect = subQ.type === 'direct';
+                                  const isSubDirect = subQ.type === 'direct' || !subQ.type;
                                   const isSubChoice = subQ.type === 'choice';
                                   const isSubMatching = subQ.type === 'matching';
+                                  const isSubAbc = subQ.type === 'abc';
+                                  const isSubNumeric = subQ.type === 'numeric';
                                   const subQPts = (q.points / q.subQuestions.length).toFixed(1);
 
                                   return (
@@ -3673,6 +3908,59 @@ function ReinforcementGrading({
                                           >
                                             <span>✗</span> Incorrecto
                                           </button>
+                                        </div>
+                                      )}
+
+                                      {isSubAbc && (
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {[
+                                            { val: 'A', label: 'A (C)', pts: subQPts },
+                                            { val: 'B', label: 'B (M)', pts: (subQPts / 2).toFixed(1) },
+                                            { val: 'C', label: 'C (I)', pts: 0 }
+                                          ].map(opt => (
+                                            <button
+                                              key={opt.val}
+                                              type="button"
+                                              onClick={() => {
+                                                setTempExamSelections(prev => {
+                                                  const qSel = { ...(prev[q.id] || {}) };
+                                                  qSel[subQ.id] = subQSelectedVal === opt.val ? null : opt.val;
+                                                  return { ...prev, [q.id]: qSel };
+                                                });
+                                              }}
+                                              className={`py-1.5 px-2 rounded-lg border flex flex-col items-center justify-center gap-0.5 transition active:scale-95 font-bold text-[9.5px] ${
+                                                subQSelectedVal === opt.val
+                                                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                                                  : 'bg-transparent text-slate-400 border-white/10 hover:bg-white/10'
+                                              }`}
+                                            >
+                                              <span>{opt.label}</span>
+                                              <span className="text-[8px] opacity-80">(+{opt.pts})</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {isSubNumeric && (
+                                        <div className="flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10">
+                                          <span className="text-[10px] font-bold text-slate-300">Puntaje:</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={subQPts}
+                                            step="any"
+                                            value={subQSelectedVal !== undefined && subQSelectedVal !== null ? subQSelectedVal : ''}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setTempExamSelections(prev => {
+                                                const qSel = { ...(prev[q.id] || {}) };
+                                                qSel[subQ.id] = val === '' ? null : Number(val);
+                                                return { ...prev, [q.id]: qSel };
+                                              });
+                                            }}
+                                            className="w-16 rounded border border-white/10 bg-black/20 px-2 py-1 text-xs font-bold text-cyan-400 focus:bg-transparent focus:border-cyan-500 transition outline-none"
+                                            placeholder={`Máx ${subQPts}`}
+                                          />
                                         </div>
                                       )}
 

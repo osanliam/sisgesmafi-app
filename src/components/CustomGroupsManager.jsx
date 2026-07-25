@@ -1,5 +1,7 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useContext, useMemo, useRef } from 'react';
 import { DatabaseContext } from '../context/DatabaseContext';
+import InstrumentGraderModal from './InstrumentGraderModal';
+import InstrumentBuilderModal from './InstrumentBuilderModal';
 import { 
   Users, 
   Plus, 
@@ -17,12 +19,16 @@ import {
   Info,
   Search,
   CheckSquare,
-  Square
+  Square,
+  FileEdit,
+  Download,
+  Upload
 } from 'lucide-react';
 
 function CustomGroupsManager() {
   const { 
     students, 
+    courses,
     customGroups, 
     saveCustomGroup, 
     deleteCustomGroup, 
@@ -61,9 +67,33 @@ function CustomGroupsManager() {
   const [evaluationName, setEvaluationName] = useState('');
   const [evaluationDate, setEvaluationDate] = useState(new Date().toISOString().split('T')[0]);
   const [scoresRecords, setScoresRecords] = useState({}); // { studentId: score }
+  const [selectedWorkshopCourseId, setSelectedWorkshopCourseId] = useState('');
 
   // Reports states
   const [selectedRepGroupId, setSelectedRepGroupId] = useState(customGroups[0]?.id || '');
+
+  // Instrument Builder / Grader states (for full instrument support)
+  const [editingGroupEvaluation, setEditingGroupEvaluation] = useState(null);
+  const [activeGradingSession, setActiveGradingSession] = useState(null);
+
+  const availableWorkshopCourses = useMemo(() => {
+    if (currentRole !== 'teacher') return courses || [];
+    return (courses || []).filter(course =>
+      (course.assignments || []).some(assignment => assignment.teacherId === currentUser?.id)
+    );
+  }, [courses, currentRole, currentUser]);
+
+  const selectedWorkshopCourse = useMemo(() =>
+    availableWorkshopCourses.find(course => course.id === selectedWorkshopCourseId) || availableWorkshopCourses[0] || null,
+  [availableWorkshopCourses, selectedWorkshopCourseId]);
+
+  const workshopStructure = selectedWorkshopCourse?.competencies || [];
+
+  React.useEffect(() => {
+    if (!selectedWorkshopCourseId && availableWorkshopCourses[0]) {
+      setSelectedWorkshopCourseId(availableWorkshopCourses[0].id);
+    }
+  }, [availableWorkshopCourses, selectedWorkshopCourseId]);
 
   // Helper to convert any score to its literal grade (AD, A, B, C)
   const getLiteralGrade = (scoreVal) => {
@@ -100,6 +130,8 @@ function CustomGroupsManager() {
     if (val >= 1.5) return 'B';
     return 'C';
   };
+
+  const isLiteralScore = (score) => ['AD', 'A', 'B', 'C'].includes(String(score || '').trim().toUpperCase());
 
   // 1. Groups Manager Logic
   const filteredStudents = useMemo(() => {
@@ -269,6 +301,81 @@ function CustomGroupsManager() {
     setEvaluationName('');
   };
 
+  // --- Instrument Builder / Grader handlers ---
+  const handleOpenBuilder = (evalData = null) => {
+    const courseId = evalData?.courseId || selectedWorkshopCourse?.id;
+    if (!courseId) return alert('Seleccione primero el curso curricular del taller.');
+    setSelectedWorkshopCourseId(courseId);
+    setEditingGroupEvaluation(evalData ? { ...evalData, groupId: selectedGrdGroupId } : { groupId: selectedGrdGroupId });
+  };
+
+  const handleCloseBuilder = () => {
+    setEditingGroupEvaluation(null);
+  };
+
+  const handleBuilderSave = async (instrumentData) => {
+    // instrumentData includes: name, date, type, instrumentConfig, items, maxGradeScale, etc.
+    const existingEvaluation = editingGroupEvaluation?.id
+      ? groupGrades.find(item => item.id === editingGroupEvaluation.id)
+      : null;
+    saveGroupEvaluation(
+      selectedGrdGroupId,
+      editingGroupEvaluation?.id || null,
+      {
+        name: instrumentData.name,
+        date: instrumentData.date || new Date().toISOString().split('T')[0],
+        type: instrumentData.type || 'Rúbrica',
+        courseId: selectedWorkshopCourse?.id,
+        courseName: selectedWorkshopCourse?.name,
+        competenceId: instrumentData.competenceId,
+        ownerId: currentUser?.id || 'admin_1',
+        teacherId: currentUser?.id || 'admin_1',
+        instrumentConfig: instrumentData.instrumentConfig,
+        items: instrumentData.items,
+        maxGradeScale: instrumentData.maxGradeScale || 'A',
+        scores: existingEvaluation?.scores || {} // editing the instrument must never erase existing grades
+      }
+    );
+    handleCloseBuilder();
+    setSelectedEvalId('new'); // refresh list
+  };
+
+  const handleOpenGrader = (student, evalItem) => {
+    const groupEvaluation = (groupGrades || []).find(g => g.id === evalItem.id);
+    const existingGrade = groupEvaluation ? {
+      studentId: student.id,
+      evaluationId: evalItem.id,
+      score: groupEvaluation.scores?.[student.id],
+      details: groupEvaluation.scores?.[`${student.id}_details`] || null
+    } : null;
+    setActiveGradingSession({ student, evalItem, existingGrade });
+  };
+
+  const handleCloseGrader = () => {
+    setActiveGradingSession(null);
+  };
+
+  const handleGraderSave = (studentId, payload) => {
+    const evalItem = activeGradingSession?.evalItem;
+    if (!evalItem) return;
+
+    const currentEval = groupGrades.find(g => g.id === evalItem.id);
+    if (!currentEval) return;
+
+    const updatedScores = {
+      ...currentEval.scores,
+      [studentId]: payload.score,
+      [`${studentId}_details`]: payload.details || {}
+    };
+
+    saveGroupEvaluation(selectedGrdGroupId, evalItem.id, {
+      ...currentEval,
+      scores: updatedScores
+    });
+
+    handleCloseGrader();
+  };
+
   // 4. Reports Logic
   const activeRepGroup = useMemo(() => {
     return customGroups.find(g => g.id === selectedRepGroupId);
@@ -314,7 +421,9 @@ function CustomGroupsManager() {
       let inDanger = false;
 
       if (stdScores.length > 0) {
-        if (gradingScale === 'literal') {
+        // Workshop instruments can use literal scales even when the global
+        // setting is numeric.  Respect the final mark saved by the grader.
+        if (stdScores.every(isLiteralScore)) {
           const totalVal = stdScores.reduce((sum, s) => sum + letterToValue(s), 0);
           averageGrade = valueToLetter(totalVal / stdScores.length);
           inDanger = averageGrade === 'C';
@@ -365,76 +474,285 @@ function CustomGroupsManager() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-extrabold tracking-tight">Grupos Especiales</h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Crea talleres, refuerzos académicos y proyectos con listas personalizadas de alumnos de cualquier sección.
-          </p>
-        </div>
+      <style>{`
+        .tab-groups-3d {
+          position: relative;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 1px solid rgba(226, 232, 240, 0.8);
+          background: #ffffff;
+          border-bottom-width: 6px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+          text-align: center;
+          outline: none;
+          select-none: none;
+        }
         
-        {activeSubTab === 'groups' && !isFormOpen && (
+        .dark .tab-groups-3d {
+          background: #1e293b;
+          border-color: rgba(51, 65, 85, 0.8);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+        
+        .tab-groups-3d:hover:not(:disabled) {
+          transform: translateY(-2px);
+          border-bottom-width: 8px;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+        }
+        
+        .dark .tab-groups-3d:hover:not(:disabled) {
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.35);
+        }
+        
+        .tab-groups-3d:active:not(:disabled) {
+          transform: translateY(2px);
+          border-bottom-width: 2px;
+          box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+        }
+        
+        .tab-groups-3d:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+
+        .emoji-3d-groups-tab {
+          font-size: 2.25rem;
+          line-height: 1;
+          display: inline-block;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-style: preserve-3d;
+          perspective: 100px;
+        }
+        
+        .tab-groups-3d:hover:not(:disabled) .emoji-3d-groups-tab {
+          transform: scale(1.1) translateY(-4px) rotate(5deg);
+        }
+        
+        /* Blue: Groups */
+        .tab-groups-blue {
+          border-bottom-color: #cbd5e1;
+        }
+        .dark .tab-groups-blue {
+          border-bottom-color: #334155;
+        }
+        .tab-groups-blue-active {
+          background: #eff6ff !important;
+          border-color: #bfdbfe !important;
+          border-bottom-width: 6px !important;
+          border-bottom-color: #3b82f6 !important;
+          color: #1d4ed8 !important;
+          box-shadow: 0 6px 12px rgba(59, 130, 246, 0.08) !important;
+        }
+        .dark .tab-groups-blue-active {
+          background: rgba(59, 130, 246, 0.1) !important;
+          border-color: #3b82f6 !important;
+          border-bottom-color: #2563eb !important;
+          color: #93c5fd !important;
+        }
+        .tab-groups-blue-active .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #bfdbfe)
+                  drop-shadow(0 2px 0 #3b82f6)
+                  drop-shadow(0 3px 0 #2563eb)
+                  drop-shadow(0 4px 0 #1d4ed8)
+                  drop-shadow(0 6px 8px rgba(37, 99, 235, 0.35)) !important;
+          transform: scale(1.05) translateZ(8px);
+        }
+        .tab-groups-blue:hover:not(:disabled) .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #bfdbfe)
+                  drop-shadow(0 2px 0 #3b82f6)
+                  drop-shadow(0 4px 6px rgba(37, 99, 235, 0.2));
+        }
+
+        /* Green: Attendance */
+        .tab-groups-green {
+          border-bottom-color: #cbd5e1;
+        }
+        .dark .tab-groups-green {
+          border-bottom-color: #334155;
+        }
+        .tab-groups-green-active {
+          background: #ecfdf5 !important;
+          border-color: #a7f3d0 !important;
+          border-bottom-width: 6px !important;
+          border-bottom-color: #10b981 !important;
+          color: #047857 !important;
+          box-shadow: 0 6px 12px rgba(16, 185, 129, 0.08) !important;
+        }
+        .dark .tab-groups-green-active {
+          background: rgba(16, 185, 129, 0.1) !important;
+          border-color: #10b981 !important;
+          border-bottom-color: #059669 !important;
+          color: #a7f3d0 !important;
+        }
+        .tab-groups-green-active .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #a7f3d0)
+                  drop-shadow(0 2px 0 #10b981)
+                  drop-shadow(0 3px 0 #059669)
+                  drop-shadow(0 4px 0 #047857)
+                  drop-shadow(0 6px 8px rgba(16, 185, 129, 0.35)) !important;
+          transform: scale(1.05) translateZ(8px);
+        }
+        .tab-groups-green:hover:not(:disabled) .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #a7f3d0)
+                  drop-shadow(0 2px 0 #10b981)
+                  drop-shadow(0 4px 6px rgba(16, 185, 129, 0.2));
+        }
+
+        /* Purple: Grades */
+        .tab-groups-purple {
+          border-bottom-color: #cbd5e1;
+        }
+        .dark .tab-groups-purple {
+          border-bottom-color: #334155;
+        }
+        .tab-groups-purple-active {
+          background: #f5f3ff !important;
+          border-color: #ddd6fe !important;
+          border-bottom-width: 6px !important;
+          border-bottom-color: #8b5cf6 !important;
+          color: #6d28d9 !important;
+          box-shadow: 0 6px 12px rgba(139, 92, 246, 0.08) !important;
+        }
+        .dark .tab-groups-purple-active {
+          background: rgba(139, 92, 246, 0.1) !important;
+          border-color: #8b5cf6 !important;
+          border-bottom-color: #7c3aed !important;
+          color: #ddd6fe !important;
+        }
+        .tab-groups-purple-active .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #ddd6fe)
+                  drop-shadow(0 2px 0 #8b5cf6)
+                  drop-shadow(0 3px 0 #7c3aed)
+                  drop-shadow(0 4px 0 #6d28d9)
+                  drop-shadow(0 6px 8px rgba(139, 92, 246, 0.35)) !important;
+          transform: scale(1.05) translateZ(8px);
+        }
+        .tab-groups-purple:hover:not(:disabled) .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #ddd6fe)
+                  drop-shadow(0 2px 0 #8b5cf6)
+                  drop-shadow(0 4px 6px rgba(139, 92, 246, 0.2));
+        }
+
+        /* Teal: Reports */
+        .tab-groups-teal {
+          border-bottom-color: #cbd5e1;
+        }
+        .dark .tab-groups-teal {
+          border-bottom-color: #334155;
+        }
+        .tab-groups-teal-active {
+          background: #f0fdfa !important;
+          border-color: #99f6e4 !important;
+          border-bottom-width: 6px !important;
+          border-bottom-color: #14b8a6 !important;
+          color: #0f766e !important;
+          box-shadow: 0 6px 12px rgba(20, 184, 166, 0.08) !important;
+        }
+        .dark .tab-groups-teal-active {
+          background: rgba(20, 184, 166, 0.1) !important;
+          border-color: #14b8a6 !important;
+          border-bottom-color: #0d9488 !important;
+          color: #99f6e4 !important;
+        }
+        .tab-groups-teal-active .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #99f6e4)
+                  drop-shadow(0 2px 0 #14b8a6)
+                  drop-shadow(0 3px 0 #0d9488)
+                  drop-shadow(0 4px 0 #0f766e)
+                  drop-shadow(0 6px 8px rgba(20, 184, 166, 0.35)) !important;
+          transform: scale(1.05) translateZ(8px);
+        }
+        .tab-groups-teal:hover:not(:disabled) .emoji-3d-groups-tab {
+          filter: drop-shadow(0 1px 0 #99f6e4)
+                  drop-shadow(0 2px 0 #14b8a6)
+                  drop-shadow(0 4px 6px rgba(20, 184, 166, 0.2));
+        }
+      `}</style>
+
+      {/* Module Header Banner (Full Width 3D) */}
+      <section className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-5 text-left relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#e11d48]/5 rounded-full blur-2xl pointer-events-none" />
+        <style>{`
+          .emoji-3d-header {
+            font-size: 2.25rem;
+            line-height: 1;
+            display: inline-block;
+            filter: drop-shadow(0 1px 0 #fca5a5)
+                    drop-shadow(0 2px 0 #f43f5e)
+                    drop-shadow(0 3px 0 #e11d48)
+                    drop-shadow(0 5px 6px rgba(225, 29, 72, 0.3));
+            transform: scale(1.05);
+          }
+        `}</style>
+        <span className="emoji-3d-header shrink-0">🧩</span>
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">Grupos Especiales</h2>
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">Crea talleres, refuerzos académicos y proyectos con listas personalizadas de alumnos de cualquier sección.</p>
+        </div>
+      </section>
+
+      {/* Module Action Row */}
+      {activeSubTab === 'groups' && !isFormOpen && (
+        <div className="flex justify-end w-full">
           <button
             onClick={handleCreateNewGroupClick}
-            className="btn-neuro-primary flex items-center gap-2 text-xs"
+            className="px-6 py-3 rounded-xl bg-[#e11d48] hover:bg-rose-700 text-white text-xs font-black tracking-widest transition-all shadow-[0_4px_12px_rgba(225,29,72,0.15)] flex items-center gap-1.5"
           >
-            <Plus className="h-4.5 w-4.5" />
+            <Plus className="h-4 w-4" />
             Crear Grupo Especial
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Sub-tabs Navigation (Module Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 w-full mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 w-full mb-6">
         <button
           onClick={() => { setActiveSubTab('groups'); setIsFormOpen(false); }}
-          className={`group flex flex-col items-center justify-center p-4 aspect-[2/1] sm:aspect-square md:aspect-auto md:h-32 module-card module-card-blue ${
-            activeSubTab === 'groups' ? 'active scale-[1.02] ring-2 ring-blue-500/15' : ''
+          className={`tab-groups-3d tab-groups-blue flex flex-col items-center justify-center p-6 rounded-3xl ${
+            activeSubTab === 'groups' ? 'tab-groups-blue-active' : 'text-slate-600 dark:text-slate-400'
           }`}
         >
-          <Users className="h-7 w-7 sm:h-10 sm:w-10 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] sm:text-xs font-black tracking-wider uppercase leading-snug text-slate-200 text-center">
-            Grupos <br className="hidden md:block" />({customGroups.length})
+          <span className="emoji-3d-groups-tab mb-3">👥</span>
+          <span className="text-xs font-black tracking-wider uppercase leading-snug text-center">
+            Grupos ({customGroups.length})
           </span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('attendance')}
-          className={`group flex flex-col items-center justify-center p-4 aspect-[2/1] sm:aspect-square md:aspect-auto md:h-32 module-card module-card-green ${
-            activeSubTab === 'attendance' ? 'active scale-[1.02] ring-2 ring-green-500/15' : ''
+          className={`tab-groups-3d tab-groups-green flex flex-col items-center justify-center p-6 rounded-3xl ${
+            activeSubTab === 'attendance' ? 'tab-groups-green-active' : 'text-slate-600 dark:text-slate-400'
           } ${customGroups.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
           disabled={customGroups.length === 0}
         >
-          <Calendar className="h-7 w-7 sm:h-10 sm:w-10 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] sm:text-xs font-black tracking-wider uppercase leading-snug text-slate-200 text-center">
-            Asistencia <br className="hidden md:block" />Taller
+          <span className="emoji-3d-groups-tab mb-3">📅</span>
+          <span className="text-xs font-black tracking-wider uppercase leading-snug text-center">
+            Asistencia Taller
           </span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('grades')}
-          className={`group flex flex-col items-center justify-center p-4 aspect-[2/1] sm:aspect-square md:aspect-auto md:h-32 module-card module-card-purple ${
-            activeSubTab === 'grades' ? 'active scale-[1.02] ring-2 ring-purple-500/15' : ''
+          className={`tab-groups-3d tab-groups-purple flex flex-col items-center justify-center p-6 rounded-3xl ${
+            activeSubTab === 'grades' ? 'tab-groups-purple-active' : 'text-slate-600 dark:text-slate-400'
           } ${customGroups.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
           disabled={customGroups.length === 0}
         >
-          <ClipboardList className="h-7 w-7 sm:h-10 sm:w-10 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] sm:text-xs font-black tracking-wider uppercase leading-snug text-slate-200 text-center">
-            Calificaciones <br className="hidden md:block" />Taller
+          <span className="emoji-3d-groups-tab mb-3">📋</span>
+          <span className="text-xs font-black tracking-wider uppercase leading-snug text-center">
+            Calificaciones Taller
           </span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('reports')}
-          className={`group flex flex-col items-center justify-center p-4 aspect-[2/1] sm:aspect-square md:aspect-auto md:h-32 module-card module-card-teal ${
-            activeSubTab === 'reports' ? 'active scale-[1.02] ring-2 ring-teal-500/15' : ''
+          className={`tab-groups-3d tab-groups-teal flex flex-col items-center justify-center p-6 rounded-3xl ${
+            activeSubTab === 'reports' ? 'tab-groups-teal-active' : 'text-slate-600 dark:text-slate-400'
           } ${customGroups.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
           disabled={customGroups.length === 0}
         >
-          <TrendingUp className="h-7 w-7 sm:h-10 sm:w-10 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] sm:text-xs font-black tracking-wider uppercase leading-snug text-slate-200 text-center">
-            Reportes <br className="hidden md:block" />y Logros
+          <span className="emoji-3d-groups-tab mb-3">📈</span>
+          <span className="text-xs font-black tracking-wider uppercase leading-snug text-center">
+            Reportes y Logros
           </span>
         </button>
       </div>
@@ -831,28 +1149,29 @@ function CustomGroupsManager() {
             </div>
 
             <div className="space-y-2.5 pt-2">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black uppercase text-slate-400">Curso curricular y competencias</label>
+                <select
+                  value={selectedWorkshopCourse?.id || ''}
+                  onChange={(e) => setSelectedWorkshopCourseId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold dark:border-slate-800 dark:bg-slate-900"
+                >
+                  {availableWorkshopCourses.map(course => (
+                    <option key={course.id} value={course.id}>{course.name}</option>
+                  ))}
+                </select>
+                <p className="text-[9px] text-slate-400">Define las competencias, capacidades y desempeños disponibles en el constructor.</p>
+              </div>
               <div className="flex justify-between items-center">
-                <label className="block text-[10px] font-black uppercase text-slate-400">Seleccionar Evaluación</label>
-                {selectedEvalId !== 'new' && (
-                  <button 
-                    onClick={() => setSelectedEvalId('new')}
-                    className="text-[10px] font-bold text-indigo-600 hover:underline"
-                  >
-                    + Crear Nueva
-                  </button>
-                )}
+                <label className="block text-[10px] font-black uppercase text-slate-400">Evaluaciones</label>
               </div>
 
               <div className="max-h-60 overflow-y-auto space-y-2 border border-slate-100 dark:border-slate-800/40 p-2.5 rounded-2xl bg-slate-50/45 dark:bg-slate-950/20">
                 <button
-                  onClick={() => setSelectedEvalId('new')}
-                  className={`w-full text-left p-2.5 rounded-xl text-xs font-bold transition ${
-                    selectedEvalId === 'new'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'bg-white dark:bg-slate-900 border border-slate-200/50 hover:bg-slate-100'
-                  }`}
+                  onClick={() => handleOpenBuilder(null)}
+                  className="w-full text-left p-2.5 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow-md"
                 >
-                  🆕 Nueva Actividad de Grupo
+                  ➕  Crear Nuevo Instrumento
                 </button>
 
                 {groupEvaluations.map(ev => (
@@ -866,116 +1185,231 @@ function CustomGroupsManager() {
                   >
                     <button
                       onClick={() => setSelectedEvalId(ev.id)}
-                      className="flex-1 text-left truncate pr-2"
+                      className="flex-1 text-left truncate pr-2 flex items-center gap-2"
                     >
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                        ev.type === 'Examen' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                        ev.type === 'Rúbrica' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
+                        ev.type === 'Lista de Cotejo' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
+                        'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                      }`}>
+                        {ev.type || 'Instrumento'}
+                      </span>
                       <p className="truncate">{ev.name}</p>
-                      <p className={`text-[9px] font-medium mt-0.5 ${selectedEvalId === ev.id ? 'text-indigo-200' : 'text-slate-400'}`}>
-                        {ev.date}
-                      </p>
                     </button>
-                    
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`¿Seguro que desea eliminar la evaluación "${ev.name}"?`)) {
-                          deleteGroupEvaluation(selectedGrdGroupId, ev.id);
-                          if (selectedEvalId === ev.id) setSelectedEvalId('new');
-                        }
-                      }}
-                      className={`p-1 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition ${
-                        selectedEvalId === ev.id ? 'text-indigo-200 hover:bg-indigo-700 hover:text-white' : 'text-slate-400'
-                      }`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {ev.instrumentConfig && ev.items && ev.items.length > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenGrader({ id: 'dummy' }, ev); // will be handled by grader
+                          }}
+                          disabled
+                          className="p-1.5 text-slate-400 opacity-50 cursor-not-allowed"
+                          title="Usa 'Calificar' en la fila del estudiante"
+                        >
+                          <FileEdit className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenBuilder(ev);
+                        }}
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-lg transition"
+                        title="Editar Instrumento"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`¿Seguro que desea eliminar la evaluación "${ev.name}"?`)) {
+                            deleteGroupEvaluation(selectedGrdGroupId, ev.id);
+                            if (selectedEvalId === ev.id) setSelectedEvalId('new');
+                          }
+                        }}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition"
+                        title="Eliminar Evaluación"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Right Panel: Scoring Form */}
+          {/* Right Panel: Evaluation Detail / Grading */}
           <div className="lg:col-span-2 glass-card p-6">
-            <h4 className="font-bold text-lg border-b border-slate-100 pb-3 dark:border-slate-800">
-              {selectedEvalId === 'new' ? 'Registrar Nueva Actividad' : 'Modificar Notas de Actividad'}
-            </h4>
-
-            {activeGrdStudents.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 italic text-sm">
-                Seleccione un grupo para habilitar las calificaciones.
+            {selectedEvalId === 'new' ? (
+              <div className="text-center py-12 text-slate-400">
+                <FileEdit className="h-12 w-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+                <p className="text-sm font-semibold">Seleccione o cree un instrumento</p>
+                <p className="text-xs text-slate-500 mt-1">Haga clic en "Crear Nuevo Instrumento" o seleccione uno de la lista</p>
               </div>
             ) : (
-              <form onSubmit={handleSaveEvaluation} className="space-y-4 pt-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black uppercase text-slate-400">Nombre de la Actividad *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej: Evaluación de Comprensión Oral 1"
-                      value={evaluationName}
-                      onChange={(e) => setEvaluationName(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white/50 px-3.5 py-2 text-xs focus:border-indigo-500 dark:border-slate-800 dark:bg-slate-900"
-                    />
+              <>
+                {/* Evaluation Header with Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 border-b border-slate-100 pb-3 dark:border-slate-800">
+                  <div>
+                    <h4 className="font-bold text-lg">{groupEvaluations.find(e => e.id === selectedEvalId)?.name || 'Cargando...'}</h4>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                      <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold uppercase">
+                        {groupEvaluations.find(e => e.id === selectedEvalId)?.type || 'Instrumento'}
+                      </span>
+                      <span>{groupEvaluations.find(e => e.id === selectedEvalId)?.date}</span>
+                      <span>Escala: {gradingScale === 'literal' ? 'Literal (AD, A, B, C)' : 'Numérica (0-10)'}</span>
+                    </div>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black uppercase text-slate-400">Fecha de Evaluación *</label>
-                    <input
-                      type="date"
-                      required
-                      value={evaluationDate}
-                      onChange={(e) => setEvaluationDate(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white/50 px-3.5 py-2 text-xs focus:border-indigo-500 dark:border-slate-800 dark:bg-slate-900"
-                    />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenBuilder(groupEvaluations.find(e => e.id === selectedEvalId))}
+                      className="btn-neuro-secondary text-xs flex items-center gap-1"
+                    >
+                      <Edit className="h-3.5 w-3.5" /> Editar Instrumento
+                    </button>
+                    <button
+                      onClick={() => setSelectedEvalId('new')}
+                      className="btn-neuro-secondary text-xs"
+                    >
+                      Volver
+                    </button>
                   </div>
                 </div>
 
-                <div className="border border-slate-200/50 dark:border-slate-800/80 rounded-2xl p-4 bg-slate-50/40 dark:bg-slate-950/20">
-                  <div className="flex justify-between items-center mb-3 text-[10px] font-black uppercase text-slate-400">
-                    <span>Estudiante</span>
-                    <span className="flex items-center gap-1.5">
-                      <Info className="h-3.5 w-3.5 text-indigo-500" />
-                      Escala Activa: {gradingScale === 'literal' ? 'Literal (C, B, A, AD)' : 'Numérica (0-10)'}
-                    </span>
+                {/* Students List with Grade Actions */}
+                {activeGrdStudents.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 italic text-sm">
+                    El grupo no tiene alumnos asignados.
                   </div>
-
-                  {/* List of students for grade input */}
-                  <div className="max-h-72 overflow-y-auto space-y-2 bg-white dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/40">
-                    {activeGrdStudents.map(s => (
-                      <div key={s.id} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 last:border-b-0 gap-4">
-                        <div className="flex items-center gap-2.5 truncate">
-                          <img src={s.avatar} alt="" className="h-7 w-7 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
-                          <div className="truncate">
-                            <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{s.name}</p>
-                            <p className="text-[9px] text-slate-400 font-mono">DNI: {s.dni}</p>
-                          </div>
-                        </div>
-
-                        <div className="w-24 shrink-0">
-                          <input
-                            type="text"
-                            placeholder={gradingScale === 'literal' ? 'AD/A/B/C' : 'Nota'}
-                            value={scoresRecords[s.id] !== undefined ? scoresRecords[s.id] : ''}
-                            onChange={(e) => setScoresRecords({ ...scoresRecords, [s.id]: e.target.value })}
-                            className="w-full text-center rounded-xl border border-slate-200 bg-white/50 px-2 py-1.5 text-xs font-bold focus:border-indigo-500 dark:border-slate-800 dark:bg-slate-900"
-                          />
-                        </div>
+                ) : (
+                  <div className="border border-slate-200/50 dark:border-slate-800/80 rounded-2xl overflow-hidden">
+                    {/* Table Header */}
+                    <div className="grid grid-cols-[1fr_repeat(3,80px)] gap-0 bg-slate-50 dark:bg-slate-900/50 px-4 py-3 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200/50 dark:border-slate-800/50">
+                      <div className="flex items-center gap-2">
+                        <span>Estudiante</span>
+                        {groupEvaluations.find(e => e.id === selectedEvalId)?.items && (
+                          <>
+                            {groupEvaluations.find(e => e.id === selectedEvalId).items.slice(0, 3).map((item, i) => (
+                              <span key={item.id} className="hidden sm:block text-center truncate w-16" title={item.text || item.id}>Item {i + 1}</span>
+                            ))}
+                            {groupEvaluations.find(e => e.id === selectedEvalId).items.length > 3 && (
+                              <span className="hidden sm:block text-center w-16">+{groupEvaluations.find(e => e.id === selectedEvalId).items.length - 3}</span>
+                            )}
+                          </>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="text-center">Promedio</div>
+                      <div className="text-center">Estado</div>
+                      <div className="text-center">Acciones</div>
+                    </div>
 
-                {/* Save Evaluation button */}
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    className="btn-neuro-primary flex items-center gap-2 text-xs"
-                  >
-                    <Save className="h-4.5 w-4.5" />
-                    {selectedEvalId === 'new' ? 'Registrar Notas' : 'Guardar Cambios'}
-                  </button>
-                </div>
-              </form>
+                    {/* Student Rows */}
+                    <div className="max-h-[500px] overflow-y-auto">
+                      {activeGrdStudents.map(s => {
+                        const evalData = groupEvaluations.find(e => e.id === selectedEvalId);
+                        const studentDetails = evalData?.scores?.[`${s.id}_details`] || {};
+                        const studentItems = evalData?.items || [];
+                        const studentScores = studentDetails.itemScores || {};
+                        const savedFinalScore = evalData?.scores?.[s.id];
+                        
+                        // The modal already calculates and saves the final
+                        // literal grade. Never replace it by an average of raw
+                        // item points, which use different weights.
+                        let avgDisplay = savedFinalScore !== undefined && savedFinalScore !== '' ? savedFinalScore : '-';
+                        if (avgDisplay === '-' && studentScores && Object.keys(studentScores).length > 0) {
+                          const vals = Object.values(studentScores).filter(v => v !== undefined && v !== '');
+                          if (vals.length > 0) {
+                            if (vals.every(isLiteralScore)) {
+                              const sum = vals.reduce((a, v) => a + letterToValue(v), 0);
+                              avgDisplay = valueToLetter(sum / vals.length);
+                            } else {
+                              avgDisplay = (vals.reduce((a, v) => a + (parseFloat(v) || 0), 0) / vals.length).toFixed(1);
+                            }
+                          }
+                        }
+
+                        const isInDanger = avgDisplay === 'C' || (!isLiteralScore(avgDisplay) && parseFloat(avgDisplay) < (parseFloat(passingGrade) || 6));
+
+                        return (
+                          <div key={s.id} className="grid grid-cols-[1fr_repeat(3,80px)] gap-0 items-center px-4 py-3 border-b border-slate-100/50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img src={s.avatar} alt="" className="h-8 w-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 flex-shrink-0" />
+                              <div className="truncate">
+                                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{s.name}</p>
+                                <p className="text-[9px] text-slate-400 font-mono">DNI: {s.dni}</p>
+                              </div>
+                              {/* Item scores preview */}
+                              {studentItems.length > 0 && (
+                                <div className="hidden sm:flex items-center gap-1 ml-2 text-[9px] text-slate-500">
+                                  {studentItems.slice(0, 3).map((item, i) => (
+                                    <span key={item.id} className="w-16 text-center truncate bg-slate-100 dark:bg-slate-800 rounded px-0.5">
+                                      {studentScores[item.id] !== undefined ? studentScores[item.id] : '—'}
+                                    </span>
+                                  ))}
+                                  {studentItems.length > 3 && <span className="w-16 text-center text-slate-400">+{studentItems.length - 3}</span>}
+                                </div>
+                              )}
+                            </div>
+                            <div className={`text-center font-bold text-sm ${isInDanger ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                              {avgDisplay}
+                            </div>
+                            <div className="text-center">
+                              {isInDanger ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded font-extrabold uppercase dark:bg-rose-950/40 dark:text-rose-300">
+                                  <AlertTriangle className="h-3 w-3" /> Riesgo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-extrabold uppercase dark:bg-emerald-950/40 dark:text-emerald-300">
+                                  <Check className="h-3 w-3" /> OK
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-center">
+                              <button
+                                onClick={() => handleOpenGrader(s, evalData)}
+                                className="btn-neuro-primary text-[10px] px-2 py-1"
+                              >
+                                <FileEdit className="h-3 w-3 mr-1" /> Calificar
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Instrument Builder Modal */}
+            {editingGroupEvaluation && (
+              <InstrumentBuilderModal
+                structure={workshopStructure}
+                initialEvaluation={editingGroupEvaluation.id ? editingGroupEvaluation : null}
+                onClose={handleCloseBuilder}
+                onSave={handleBuilderSave}
+              />
+            )}
+
+            {/* Instrument Grader Modal */}
+            {activeGradingSession && (
+              <InstrumentGraderModal
+                student={activeGradingSession.student}
+                instrument={activeGradingSession.evalItem}
+                initialGrade={activeGradingSession.existingGrade}
+                studentGrades={activeGrdStudents.map(student => ({
+                  studentId: student.id,
+                  evaluationId: activeGradingSession.evalItem.id,
+                  score: activeGradingSession.evalItem.scores?.[student.id],
+                  details: activeGradingSession.evalItem.scores?.[`${student.id}_details`] || null
+                }))}
+                enrolledStudents={activeGrdStudents}
+                onClose={handleCloseGrader}
+                onSave={handleGraderSave}
+              />
             )}
           </div>
         </div>

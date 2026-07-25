@@ -368,31 +368,45 @@ function CourseManager() {
       `}</style>
 
       
-      {/* Module Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="glass-card-ecc tint-magenta p-6 rounded-3xl w-full sm:w-auto border-l-4 border-l-kinetic-magenta relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 h-24 w-24 bg-kinetic-magenta/20 rounded-full blur-2xl"></div>
-          <h2 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
-            <BookOpen className="h-8 w-8 text-kinetic-magenta glow-magenta" />
-            Cursos y Horarios
-          </h2>
-          <p className="text-kinetic-magenta font-bold text-sm mt-1">
-            Gestione el plan curricular, asigne docentes y estructure los horarios.
-          </p>
+      {/* Module Header Banner (Full Width 3D) */}
+      <section className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-5 text-left relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#e11d48]/5 rounded-full blur-2xl pointer-events-none" />
+        <style>{`
+          .emoji-3d-header {
+            font-size: 2.25rem;
+            line-height: 1;
+            display: inline-block;
+            filter: drop-shadow(0 1px 0 #fca5a5)
+                    drop-shadow(0 2px 0 #f43f5e)
+                    drop-shadow(0 3px 0 #e11d48)
+                    drop-shadow(0 5px 6px rgba(225, 29, 72, 0.3));
+            transform: scale(1.05);
+          }
+        `}</style>
+        <span className="emoji-3d-header shrink-0">📖</span>
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">Cursos y Horarios</h2>
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">Gestione el plan curricular, asigne docentes y estructure los horarios.</p>
         </div>
+      </section>
+
+      {/* Module Navigation Row (Separate row for actions) */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Left side spacer / info if needed */}
+        <div></div>
 
         {/* Action Toggle buttons */}
         <div className="flex items-center gap-3">
-          <div className="bg-transparent/10  p-1 rounded-xl text-xs font-semibold flex">
+          <div className="bg-slate-100 dark:bg-slate-950 p-1.5 rounded-xl text-xs font-semibold flex border border-slate-200 dark:border-slate-800">
             <button 
               onClick={() => setViewMode('mesh')}
-              className={`px-3 py-1.5 rounded-lg transition ${viewMode === 'mesh' ? 'bg-transparent  text-kinetic-cyan shadow' : 'text-slate-500 hover:text-slate-200'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all font-bold ${viewMode === 'mesh' ? 'bg-[#e11d48] text-white shadow-sm' : 'text-slate-500 hover:text-slate-850 dark:hover:text-slate-200'}`}
             >
               Mallas Curriculares
             </button>
             <button 
               onClick={() => setViewMode('schedule')}
-              className={`px-3 py-1.5 rounded-lg transition ${viewMode === 'schedule' ? 'bg-transparent  text-kinetic-cyan shadow' : 'text-slate-500 hover:text-slate-200'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all font-bold ${viewMode === 'schedule' ? 'bg-[#e11d48] text-white shadow-sm' : 'text-slate-500 hover:text-slate-850 dark:hover:text-slate-200'}`}
             >
               Horario Integrado
             </button>
@@ -400,7 +414,7 @@ function CourseManager() {
           
           <button 
             onClick={() => setShowAddCourse(!showAddCourse)}
-            className="px-6 py-3 rounded-xl bg-kinetic-cyan hover:bg-cyan-400 text-white text-xs font-black tracking-widest transition-all shadow-[0_0_15px_rgba(0,240,255,0.4)] py-1.5 flex items-center gap-1.5"
+            className="px-6 py-3 rounded-xl bg-[#e11d48] hover:bg-rose-700 text-white text-xs font-black tracking-widest transition-all shadow-[0_4px_12px_rgba(225,29,72,0.15)] flex items-center gap-1.5"
           >
             <Plus className="h-4 w-4" />
             Crear Curso

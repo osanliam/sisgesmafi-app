@@ -1,7 +1,9 @@
 import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { DatabaseContext } from '../context/DatabaseContext';
+import { canViewEvaluation } from '../utils/evaluationAccess';
 import AttendanceTracker from './AttendanceTracker';
 import GradingPortal from './GradingPortal';
+import FormativeGradingPortal from './FormativeGradingPortal';
 import ConductLogger from './ConductLogger';
 import ReinforcementGrading from './ReinforcementGrading';
 import { 
@@ -28,6 +30,140 @@ import {
   ThumbsUp,
   ThumbsDown
 } from 'lucide-react';
+
+// 3D-Like High-Quality Subtab Icons
+const SubtabBookIcon3D = () => (
+  <svg viewBox="0 0 64 64" className="h-10 w-10 mb-2.5 transition-transform duration-250 group-hover:scale-110 drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="stBookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#93c5fd" />
+        <stop offset="100%" stopColor="#3b82f6" />
+      </linearGradient>
+      <filter id="stBookGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#3b82f6" floodOpacity="0.3" />
+      </filter>
+    </defs>
+    <path d="M12 16 C12 10, 32 10, 32 16 V52 C32 46, 12 46, 12 52 Z" fill="url(#stBookGrad)" filter="url(#stBookGlow)" stroke="#3b82f6" strokeWidth="1.5" />
+    <path d="M52 16 C52 10, 32 10, 32 16 V52 C32 46, 52 46, 52 52 Z" fill="url(#stBookGrad)" filter="url(#stBookGlow)" stroke="#3b82f6" strokeWidth="1.5" />
+    <path d="M12 52 H52" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
+  </svg>
+);
+
+const SubtabCalendarIcon3D = () => (
+  <svg viewBox="0 0 64 64" className="h-10 w-10 mb-2.5 transition-transform duration-250 group-hover:scale-110 drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="stCalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#c084fc" />
+        <stop offset="100%" stopColor="#a855f7" />
+      </linearGradient>
+      <filter id="stCalGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#a855f7" floodOpacity="0.3" />
+      </filter>
+    </defs>
+    <rect x="10" y="14" width="44" height="40" rx="6" fill="#ffffff" stroke="#e9d5ff" strokeWidth="2" />
+    <path d="M10 18 C10 15, 15 14, 20 14 H44 C49 14, 54 15, 54 18 V26 H10 Z" fill="url(#stCalGrad)" filter="url(#stCalGlow)" />
+    <circle cx="20" cy="36" r="3" fill="#a855f7" />
+    <circle cx="32" cy="36" r="3" fill="#d8b4fe" />
+    <circle cx="44" cy="36" r="3" fill="#d8b4fe" />
+    <circle cx="20" cy="45" r="3" fill="#d8b4fe" />
+    <circle cx="32" cy="45" r="3" fill="#a855f7" />
+    <circle cx="44" cy="45" r="3" fill="#d8b4fe" />
+  </svg>
+);
+
+const SubtabClipboardIcon3D = () => (
+  <svg viewBox="0 0 64 64" className="h-10 w-10 mb-2.5 transition-transform duration-250 group-hover:scale-110 drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="stClipGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#fca5a5" />
+        <stop offset="100%" stopColor="#ef4444" />
+      </linearGradient>
+      <filter id="stClipGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#ef4444" floodOpacity="0.25" />
+      </filter>
+    </defs>
+    <rect x="14" y="14" width="36" height="42" rx="4" fill="#f8fafc" stroke="#fca5a5" strokeWidth="2" />
+    <rect x="18" y="20" width="28" height="32" rx="2" fill="#ffffff" />
+    <rect x="24" y="8" width="16" height="8" rx="3" fill="url(#stClipGrad)" filter="url(#stClipGlow)" stroke="#ef4444" strokeWidth="1" />
+    <path d="M22 28 L26 32 L34 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+    <line x1="22" y1="38" x2="42" y2="38" stroke="#fca5a5" strokeWidth="2" strokeLinecap="round" />
+    <line x1="22" y1="44" x2="36" y2="44" stroke="#fca5a5" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const SubtabSparklesIcon3D = () => (
+  <svg viewBox="0 0 64 64" className="h-10 w-10 mb-2.5 transition-transform duration-250 group-hover:scale-110 drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="stSparkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#fde047" />
+        <stop offset="100%" stopColor="#f59e0b" />
+      </linearGradient>
+      <filter id="stSparkGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#f59e0b" floodOpacity="0.3" />
+      </filter>
+    </defs>
+    <path d="M32 10 L36 24 L50 28 L36 32 L32 46 L28 32 L14 28 L28 24 Z" fill="url(#stSparkGrad)" filter="url(#stSparkGlow)" stroke="#fef08a" strokeWidth="1" />
+    <path d="M48 14 L50 20 L56 22 L50 24 L48 30 L46 24 L40 22 L46 20 Z" fill="#fde047" opacity="0.8" />
+    <path d="M16 40 L17.5 44.5 L22 46 L17.5 47.5 L16 52 L14.5 47.5 L10 46 L14.5 44.5 Z" fill="#f59e0b" opacity="0.9" />
+  </svg>
+);
+
+const SubtabTrendIcon3D = () => (
+  <svg viewBox="0 0 64 64" className="h-10 w-10 mb-2.5 transition-transform duration-250 group-hover:scale-110 drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="stTrendGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#67e8f9" />
+        <stop offset="100%" stopColor="#06b6d4" />
+      </linearGradient>
+      <filter id="stTrendGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="2" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+    <rect x="14" y="36" width="6" height="14" rx="2" fill="#0891b2" opacity="0.6" />
+    <rect x="24" y="26" width="6" height="24" rx="2" fill="url(#stTrendGrad)" />
+    <rect x="34" y="16" width="6" height="34" rx="2" fill="url(#stTrendGrad)" />
+    <path d="M12 40 L28 26 L42 20 L52 10 M44 10 H52 V18" fill="none" stroke="#22d3ee" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" filter="url(#stTrendGlow)" />
+  </svg>
+);
+
+const SubtabAwardIcon3D = () => (
+  <svg viewBox="0 0 64 64" className="h-10 w-10 mb-2.5 transition-transform duration-250 group-hover:scale-110 drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="stAwardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#6ee7b7" />
+        <stop offset="100%" stopColor="#10b981" />
+      </linearGradient>
+      <filter id="stAwardGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#10b981" floodOpacity="0.3" />
+      </filter>
+    </defs>
+    <path d="M24 36 L20 54 L32 48 L44 54 L40 36" fill="#047857" opacity="0.8" />
+    <path d="M28 36 L24 50 L32 46 L40 50 L36 36" fill="#34d399" opacity="0.9" />
+    <circle cx="32" cy="26" r="16" fill="url(#stAwardGrad)" filter="url(#stAwardGlow)" stroke="#34d399" strokeWidth="1.5" />
+    <circle cx="32" cy="26" r="11" fill="none" stroke="#a7f3d0" strokeWidth="2" strokeDasharray="3 3" opacity="0.6" />
+    <polygon points="32 18 35 24 41 25 36 29 38 35 32 31 26 35 28 29 23 25 29 24" fill="#ffffff" />
+  </svg>
+);
+
+const SubtabFileIcon3D = () => (
+  <svg viewBox="0 0 64 64" className="h-10 w-10 mb-2.5 transition-transform duration-250 group-hover:scale-110 drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="stFileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#a5f3fc" />
+        <stop offset="100%" stopColor="#0ea5e9" />
+      </linearGradient>
+      <filter id="stFileGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#0ea5e9" floodOpacity="0.35" />
+      </filter>
+    </defs>
+    <path d="M16 10 H38 L48 20 V54 C48 56, 46 58, 44 58 H16 C14 58, 12 56, 12 54 V14 C12 12, 14 10, 16 10 Z" fill="url(#stFileGrad)" filter="url(#stFileGlow)" stroke="#0ea5e9" strokeWidth="1.5" />
+    <path d="M38 10 V20 H48 Z" fill="#0284c7" />
+    <line x1="18" y1="28" x2="42" y2="28" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+    <line x1="18" y1="36" x2="42" y2="36" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+    <line x1="18" y1="44" x2="34" y2="44" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+  </svg>
+);
 
 const getInitials = (name) => {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -73,7 +209,7 @@ function ClassroomManager() {
   const [selectedBimester, setSelectedBimester] = useState('1');
   const [selectedUnit, setSelectedUnit] = useState('0');
 
-  // Sub-tabs navigation: 'selector', 'attendance', 'grading', 'conduct', 'reports'
+  // Sub-tabs navigation: 'selector', 'attendance', 'grading', 'formative', 'conduct', 'reports'
   const [activeSubTab, setActiveSubTab] = useState('selector');
 
   const [selectedStudentForReport, setSelectedStudentForReport] = useState(null);
@@ -224,6 +360,7 @@ function ClassroomManager() {
 
     // Filter evaluations in current course, bimester and unit
     const courseEvals = evaluations.filter(ev => 
+      canViewEvaluation(ev, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
       ev.courseId === selectedCourseId &&
       (ev.bimester || '1') === selectedBimester &&
       (ev.unit !== undefined && ev.unit !== null ? String(ev.unit) : '0') === selectedUnit
@@ -315,7 +452,7 @@ function ClassroomManager() {
       classGradeAvg,
       evalCount: courseEvals.length
     };
-  }, [enrolledStudents, selectedCourseId, selectedBimester, selectedUnit, evaluations, grades, attendance, gradingScale, passingGrade]);
+  }, [enrolledStudents, selectedCourseId, selectedBimester, selectedUnit, selectedSection, evaluations, grades, attendance, gradingScale, passingGrade, currentRole, currentUser]);
 
   // ========================================================
   // 360° DIAGNOSTIC CALCULATIONS FOR SELECTED STUDENT
@@ -325,11 +462,12 @@ function ClassroomManager() {
   const studentEvaluations = useMemo(() => {
     if (!student || !selectedCourseId) return [];
     return evaluations.filter(ev => 
+      canViewEvaluation(ev, { role: currentRole, userId: currentUser?.id, section: selectedSection }) &&
       ev.courseId === selectedCourseId &&
       (ev.bimester || '1') === selectedBimester &&
       (ev.unit !== undefined && ev.unit !== null ? String(ev.unit) : '0') === selectedUnit
     );
-  }, [student, evaluations, selectedCourseId, selectedBimester, selectedUnit]);
+  }, [student, evaluations, selectedCourseId, selectedBimester, selectedUnit, selectedSection, currentRole, currentUser]);
 
   const studentGradesList = useMemo(() => {
     if (!student) return [];
@@ -360,35 +498,6 @@ function ClassroomManager() {
       };
     });
   }, [student, studentEvaluations, grades, reinforcementGrades, selectedCourseId, selectedBimester]);
-
-  const groupedGradesByCompetence = useMemo(() => {
-    if (!student) return [];
-    const c = courses.find(course => course.id === selectedCourseId);
-    const comps = c ? c.competencies || [] : [];
-    
-    // Group grades
-    const groups = comps.map(comp => {
-      const gradesForComp = studentGradesList.filter(g => g.evaluation.competenceId === comp.id);
-      return {
-        competence: comp,
-        grades: gradesForComp
-      };
-    }).filter(group => group.grades.length > 0);
-    
-    // Group evaluations with no competenceId or unmatched competenceId
-    const otherGrades = studentGradesList.filter(g => 
-      !g.evaluation.competenceId || !comps.some(c => c.id === g.evaluation.competenceId)
-    );
-    
-    if (otherGrades.length > 0) {
-      groups.push({
-        competence: { id: 'other', name: 'Evaluaciones Generales' },
-        grades: otherGrades
-      });
-    }
-    
-    return groups;
-  }, [student, courses, selectedCourseId, studentGradesList]);
 
   const studentAttendanceList = useMemo(() => {
     if (!student || !selectedCourseId) return [];
@@ -531,11 +640,16 @@ function ClassroomManager() {
   }, [student, studentAttendanceStats, studentAverages, studentConductStats, gradingScale, passingGrade]);
 
   return (
-    <div className="space-y-6 text-white min-h-screen bg-[#060a14] p-4 sm:p-8">
+    <div className="space-y-6 text-slate-800 dark:text-slate-100 min-h-screen bg-[#f8fafc] dark:bg-[#060a14] p-4 sm:p-8">
       <style>{`
         .glass-card-ecc {
           backdrop-filter: blur(24px);
           -webkit-backdrop-filter: blur(24px);
+          background: rgba(255, 255, 255, 0.7);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        }
+        .dark .glass-card-ecc {
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.08);
           box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
@@ -553,49 +667,67 @@ function ClassroomManager() {
           height: 6px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255,255,255,0.02);
+          background: rgba(0,0,0,0.02);
           border-radius: 8px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.02);
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.1);
+          background: rgba(0,0,0,0.1);
           border-radius: 8px;
         }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.1);
+        }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(0,0,0,0.2);
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(255,255,255,0.2);
         }
       `}</style>
       
-      {/* 1. Header with selector status */}
-      <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4">
-        <div className="flex items-stretch gap-4 w-full lg:w-auto shrink-0 h-full">
-          
-          <div className="glass-card-ecc tint-cyan p-6 rounded-3xl w-full sm:w-64 border-l-4 border-l-kinetic-cyan relative overflow-hidden flex flex-col justify-center">
-            <div className="absolute -right-4 -top-4 h-24 w-24 bg-kinetic-cyan/20 rounded-full blur-2xl"></div>
-            <h2 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
-              <BookOpen className="h-8 w-8 text-kinetic-cyan glow-cyan" />
-              Gestión de Aula
-            </h2>
-            {activeSubTab !== 'selector' && selectedGrade ? (
-              <p className="text-xs font-bold text-slate-400  flex items-center gap-1.5 flex-wrap">
-                CLASE: 
-                <span className="bg-white/5 bg-white/5 text-kinetic-cyan dark:text-cyan-300 px-2.5 py-0.5 rounded-full text-xs font-black">
-                  {activeCourseName} ({selectedGrade} - Secc. {selectedSection})
-                </span>
-              </p>
-            ) : (
-              <p className="text-slate-400  text-xs font-semibold">Panel centralizado para el control del aula de clases.</p>
-            )}
+      {/* Module Header Banner (Full Width 3D) */}
+      <section className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col sm:flex-row items-center justify-between gap-5 text-left relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#e11d48]/5 rounded-full blur-2xl pointer-events-none" />
+        <style>{`
+          .emoji-3d-header {
+            font-size: 2.25rem;
+            line-height: 1;
+            display: inline-block;
+            filter: drop-shadow(0 1px 0 #fca5a5)
+                    drop-shadow(0 2px 0 #f43f5e)
+                    drop-shadow(0 3px 0 #e11d48)
+                    drop-shadow(0 5px 6px rgba(225, 29, 72, 0.3));
+            transform: scale(1.05);
+          }
+        `}</style>
+        <div className="flex items-center gap-5">
+          <span className="emoji-3d-header shrink-0">🏫</span>
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">Gestión de Aula</h2>
+            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">Panel centralizado para el control del aula de clases y asistencia.</p>
           </div>
         </div>
+        {activeSubTab !== 'selector' && selectedGrade && (
+          <div className="z-10 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-end gap-1 shrink-0">
+            <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Clase Activa</span>
+            <span className="text-[#e11d48] dark:text-rose-400 text-xs font-black uppercase">
+              {activeCourseName} ({selectedGrade} - Secc. {selectedSection})
+            </span>
+          </div>
+        )}
+      </section>
 
-        {/* Right side: Flex column stacking context items */}
-        <div className="flex flex-col gap-3 w-full flex-1 justify-start">
-          {/* Global period control if a class is active */}
-          {activeSubTab !== 'selector' && (
-            <div className="flex flex-wrap items-center justify-start xl:justify-end gap-3.5 bg-white/10  p-2 rounded-2xl border border-white/10">
+      {/* 1. Header with selectors / switched position */}
+      {activeSubTab !== 'selector' && (
+        <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4 w-full">
+          <div className="flex flex-col gap-3 w-full flex-1 justify-start">
+            <div className="flex flex-wrap items-center justify-start xl:justify-end gap-3.5 bg-slate-100 dark:bg-slate-950 p-2 rounded-2xl border border-slate-200 dark:border-slate-800">
               {/* Quick class switcher */}
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black uppercase text-slate-400  px-1">Clase:</span>
+                <span className="text-[10px] font-black uppercase text-slate-450 px-1">Clase:</span>
                 <select
                   value={`${selectedCourseId}_${selectedGrade}_${selectedSection}`}
                   onChange={(e) => {
@@ -607,7 +739,7 @@ function ClassroomManager() {
                       setSelectedSection(match.section);
                     }
                   }}
-                  className="bg-transparent border border-kinetic-cyan shadow-[0_0_8px_rgba(0,240,255,0.4)] px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-200  outline-none cursor-pointer"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
                 >
                   {myClasses.map(c => (
                     <option key={c.key} value={`${c.courseId}_${c.gradeLevel}_${c.section}`}>
@@ -619,11 +751,11 @@ function ClassroomManager() {
 
               {/* Bimester switcher */}
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black uppercase text-slate-400  px-1">Periodo:</span>
+                <span className="text-[10px] font-black uppercase text-slate-450 px-1">Periodo:</span>
                 <select 
                   value={selectedBimester} 
                   onChange={(e) => setSelectedBimester(e.target.value)}
-                  className="bg-transparent border border-kinetic-cyan shadow-[0_0_8px_rgba(0,240,255,0.4)] px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-200  outline-none"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-700 dark:text-slate-200 outline-none"
                 >
                   {bimestersOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -632,12 +764,12 @@ function ClassroomManager() {
               </div>
 
               {/* Unit switcher */}
-              {activeSubTab === 'grading' && (
+              {(activeSubTab === 'grading' || activeSubTab === 'formative') && (
                 <div className="flex items-center gap-1.5">
                   <select 
                     value={selectedUnit} 
                     onChange={(e) => setSelectedUnit(e.target.value)}
-                    className="bg-transparent border border-kinetic-cyan shadow-[0_0_8px_rgba(0,240,255,0.4)] px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-200  outline-none"
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-700 dark:text-slate-200 outline-none"
                   >
                     {unitOptions.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -648,20 +780,20 @@ function ClassroomManager() {
 
               <button
                 onClick={() => setActiveSubTab('selector')}
-                className="text-xs font-bold text-white bg-gradient-to-r from-orange-400 via-rose-400 to-indigo-500 hover:from-orange-500 hover:to-indigo-650 px-4 py-1.5 rounded-xl transition active:scale-95 shadow-[0_4px_12px_rgba(244,63,94,0.15)]"
+                className="text-xs font-bold text-white bg-[#e11d48] hover:bg-rose-700 px-4 py-1.5 rounded-xl transition active:scale-95 shadow-sm"
               >
                 Volver
               </button>
             </div>
-          )}
-          
-          {/* Slot for contextual header injected by active sub-tab */}
-          <div id="classroom-context-header-slot" className="empty:hidden flex flex-col gap-3 w-full"></div>
+            
+            {/* Slot for contextual header injected by active sub-tab */}
+            <div id="classroom-context-header-slot" className="empty:hidden flex flex-col gap-3 w-full"></div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 2. Mockup 6-Cards Grid Layout (Only active if a course is selected) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 w-full">
+      {/* 2. Mockup 7-Cards Grid Layout (Only active if a course is selected) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3.5 w-full">
         {/* Card 1: Cursos y Secciones */}
         <button
           onClick={() => setActiveSubTab('selector')}
@@ -669,11 +801,11 @@ function ClassroomManager() {
             activeSubTab === 'selector' ? 'active scale-[1.02] ring-2 ring-blue-500/15' : ''
           }`}
         >
-          <BookOpen className="h-11 w-11 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] font-black tracking-wider uppercase leading-snug text-slate-200 ">Cursos y Secciones</span>
+          <SubtabBookIcon3D />
+          <span className="text-[9px] font-black tracking-wider uppercase leading-snug text-slate-700 dark:text-slate-200 text-center">Cursos y Secciones</span>
         </button>
 
-        {/* Card 2: Asistencia Oficial */}
+        {/* Card 2: Asistencia */}
         <button
           onClick={() => setActiveSubTab('attendance')}
           disabled={!selectedCourseId}
@@ -681,11 +813,11 @@ function ClassroomManager() {
             activeSubTab === 'attendance' ? 'active scale-[1.02] ring-2 ring-purple-500/15' : ''
           }`}
         >
-          <Calendar className="h-11 w-11 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] font-black tracking-wider uppercase leading-snug text-slate-200 ">Asistencia Oficial</span>
+          <SubtabCalendarIcon3D />
+          <span className="text-[9px] font-black tracking-wider uppercase leading-snug text-slate-700 dark:text-slate-200 text-center">Asistencia Oficial</span>
         </button>
 
-        {/* Card 3: Calificaciones Oficiales */}
+        {/* Card 3: Oficial */}
         <button
           onClick={() => setActiveSubTab('grading')}
           disabled={!selectedCourseId}
@@ -693,11 +825,23 @@ function ClassroomManager() {
             activeSubTab === 'grading' ? 'active scale-[1.02] ring-2 ring-red-500/15' : ''
           }`}
         >
-          <ClipboardList className="h-11 w-11 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] font-black tracking-wider uppercase leading-snug text-slate-200 ">Calificaciones Oficiales</span>
+          <SubtabClipboardIcon3D />
+          <span className="text-[9px] font-black tracking-wider uppercase leading-snug text-slate-700 dark:text-slate-200 text-center">Calificaciones Oficiales</span>
         </button>
 
-        {/* Card 4: Calificaciones de Refuerzo */}
+        {/* Card 3.5: Formativa */}
+        <button
+          onClick={() => setActiveSubTab('formative')}
+          disabled={!selectedCourseId}
+          className={`group flex flex-col items-center justify-center p-4 aspect-square module-card module-card-amber ${
+            activeSubTab === 'formative' ? 'active scale-[1.02] ring-2 ring-amber-500/15' : ''
+          }`}
+        >
+          <SubtabSparklesIcon3D />
+          <span className="text-[9px] font-black tracking-wider uppercase leading-snug text-slate-700 dark:text-slate-200 text-center">Calificaciones Formativas</span>
+        </button>
+
+        {/* Card 4: Refuerzo */}
         <button
           onClick={() => setActiveSubTab('reinforcement-grading')}
           disabled={!selectedCourseId}
@@ -705,11 +849,11 @@ function ClassroomManager() {
             activeSubTab === 'reinforcement-grading' ? 'active scale-[1.02] ring-2 ring-cyan-500/15' : ''
           }`}
         >
-          <Sparkles className="h-11 w-11 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] font-black tracking-wider uppercase leading-snug text-slate-200 ">Calificaciones de Refuerzo</span>
+          <SubtabTrendIcon3D />
+          <span className="text-[9px] font-black tracking-wider uppercase leading-snug text-slate-700 dark:text-slate-200 text-center">Calificaciones de Refuerzo</span>
         </button>
 
-        {/* Card 5: GAMA (Convivencia) */}
+        {/* Card 5: GAMA */}
         <button
           onClick={() => setActiveSubTab('conduct')}
           disabled={!selectedCourseId}
@@ -717,11 +861,11 @@ function ClassroomManager() {
             activeSubTab === 'conduct' ? 'active scale-[1.02] ring-2 ring-emerald-500/15' : ''
           }`}
         >
-          <Award className="h-11 w-11 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] font-black tracking-wider uppercase leading-snug text-slate-200 ">GAMA (Convivencia)</span>
+          <SubtabAwardIcon3D />
+          <span className="text-[9px] font-black tracking-wider uppercase leading-snug text-slate-700 dark:text-slate-200 text-center">Gamma (Convivencia)</span>
         </button>
 
-        {/* Card 6: Reportes y Logros */}
+        {/* Card 6: Reportes */}
         <button
           onClick={() => setActiveSubTab('reports')}
           disabled={!selectedCourseId}
@@ -729,8 +873,8 @@ function ClassroomManager() {
             activeSubTab === 'reports' ? 'active scale-[1.02] ring-2 ring-sky-500/15' : ''
           }`}
         >
-          <TrendingUp className="h-11 w-11 mb-2.5 transition-transform duration-300 group-hover:scale-105 text-inherit shrink-0" />
-          <span className="text-[10px] font-black tracking-wider uppercase leading-snug text-slate-200 ">Reportes y Logros</span>
+          <SubtabFileIcon3D />
+          <span className="text-[9px] font-black tracking-wider uppercase leading-snug text-slate-700 dark:text-slate-200 text-center">Reportes y Logros</span>
         </button>
       </div>
 
@@ -808,10 +952,10 @@ function ClassroomManager() {
             {/* Grid of Class Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {myClasses.length === 0 ? (
-                <div className="col-span-3 text-center py-12 bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-[24px] text-slate-400">
+                <div className="col-span-3 text-center py-12 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-[24px] text-slate-600 dark:text-slate-400">
                   <BookOpen className="h-10 w-10 text-kinetic-cyan mb-3 mx-auto" />
-                  <p className="text-sm font-semibold">No se encontraron asignaciones curriculares.</p>
-                  <p className="text-xs text-slate-400 mt-1">Póngase en contacto con el administrador escolar para configurar sus cursos.</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">No se encontraron asignaciones curriculares.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Póngase en contacto con el administrador escolar para configurar sus cursos.</p>
                 </div>
               ) : (
                 myClasses.map((cls, index) => {
@@ -872,7 +1016,7 @@ function ClassroomManager() {
           </div>
         )}
 
-        {/* TAB 2: Embedded Attendance Tracker */}
+        {/* TAB 2: Attendance */}
         {activeSubTab === 'attendance' && selectedCourseId && (
           <div className="animate-in fade-in duration-200">
             <AttendanceTracker
@@ -885,7 +1029,7 @@ function ClassroomManager() {
           </div>
         )}
 
-        {/* TAB 3: Embedded Grading Portal */}
+        {/* TAB 3: Grading Portal */}
         {activeSubTab === 'grading' && selectedCourseId && (
           <div className="animate-in fade-in duration-200">
             <GradingPortal
@@ -902,6 +1046,19 @@ function ClassroomManager() {
                 if (bimester) setSelectedBimester(bimester);
                 if (unit) setSelectedUnit(unit);
               }}
+            />
+          </div>
+        )}
+
+        {/* TAB 3.5: Embedded Formative Grading Portal */}
+        {activeSubTab === 'formative' && selectedCourseId && (
+          <div className="animate-in fade-in duration-200">
+            <FormativeGradingPortal
+              course={courses.find(c => c.id === selectedCourseId) || {}}
+              enrolledStudents={enrolledStudents}
+              selectedSection={selectedSection}
+              selectedBimester={selectedBimester}
+              selectedUnit={selectedUnit}
             />
           </div>
         )}

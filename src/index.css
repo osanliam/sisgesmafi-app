@@ -30,7 +30,7 @@
   input[type="tel"],
   select,
   textarea {
-    @apply w-full rounded-2xl border border-slate-200 bg-white/50 dark:border-slate-800 dark:bg-slate-900/40 backdrop-blur-md px-4 py-2.5 text-sm transition-all duration-300 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white dark:focus:bg-slate-900 dark:text-slate-100 font-semibold placeholder-slate-400 dark:placeholder-slate-500 outline-none shadow-sm;
+    @apply w-full rounded-xl border border-slate-200 bg-white/50 dark:border-slate-800 dark:bg-slate-900/40 backdrop-blur-md px-4 py-2.5 text-sm transition-all duration-300 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white dark:focus:bg-slate-900 dark:text-slate-100 font-semibold placeholder-slate-400 dark:placeholder-slate-500 outline-none shadow-sm;
   }
 
   /* Disabled inputs */
@@ -108,23 +108,23 @@
 
   /* Neuroeducational visual feedback buttons */
   .btn-neuro-primary {
-    @apply relative overflow-hidden bg-gradient-to-tr from-violet-600 via-indigo-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-bold px-4 py-2.5 rounded-2xl shadow-[0_8px_25px_-5px_rgba(239,68,68,0.35)] hover:shadow-[0_12px_30px_-4px_rgba(239,68,68,0.5)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20;
+    @apply relative overflow-hidden bg-gradient-to-tr from-violet-600 via-indigo-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-[0_8px_25px_-5px_rgba(239,68,68,0.35)] hover:shadow-[0_12px_30px_-4px_rgba(239,68,68,0.5)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20;
   }
 
   .btn-neuro-success {
-    @apply relative overflow-hidden bg-gradient-to-tr from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold px-4 py-2.5 rounded-2xl shadow-[0_8px_25px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_12px_30px_-4px_rgba(16,185,129,0.45)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/20;
+    @apply relative overflow-hidden bg-gradient-to-tr from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold px-4 py-2.5 rounded-xl shadow-[0_8px_25px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_12px_30px_-4px_rgba(16,185,129,0.45)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/20;
   }
 
   .btn-neuro-danger {
-    @apply relative overflow-hidden bg-gradient-to-tr from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold px-4 py-2.5 rounded-2xl shadow-[0_8px_25px_-5px_rgba(244,63,94,0.3)] hover:shadow-[0_12px_30px_-4px_rgba(244,63,94,0.45)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-rose-500/20;
+    @apply relative overflow-hidden bg-gradient-to-tr from-rose-650 to-red-650 hover:from-rose-550 hover:to-red-550 text-white font-bold px-4 py-2.5 rounded-xl shadow-[0_8px_25px_-5px_rgba(244,63,94,0.3)] hover:shadow-[0_12px_30px_-4px_rgba(244,63,94,0.45)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-rose-500/20;
   }
 
   .btn-neuro-warning {
-    @apply relative overflow-hidden bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold px-4 py-2.5 rounded-2xl shadow-[0_8px_25px_-5px_rgba(245,158,11,0.3)] hover:shadow-[0_12px_30px_-4px_rgba(245,158,11,0.45)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-amber-500/20;
+    @apply relative overflow-hidden bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold px-4 py-2.5 rounded-xl shadow-[0_8px_25px_-5px_rgba(245,158,11,0.3)] hover:shadow-[0_12px_30px_-4px_rgba(245,158,11,0.45)] active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-amber-500/20;
   }
 
   .btn-neuro-secondary {
-    @apply relative overflow-hidden bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-4 py-2.5 rounded-2xl border border-slate-200/40 dark:border-slate-800/30 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-slate-500/20;
+    @apply relative overflow-hidden bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-4 py-2.5 rounded-xl border border-slate-200/40 dark:border-slate-800/30 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-slate-500/20;
   }
 
   /* Stitch Mockup Styles */
@@ -195,20 +195,40 @@ table {
 }
 
 table th {
-  background: rgba(255, 255, 255, 0.03) !important;
-  color: #94a3b8 !important; /* slate-400 */
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: #475569 !important; /* slate-600 */
   font-family: 'Outfit', sans-serif !important;
   font-size: 11px !important;
   font-weight: 800 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
   border-radius: 12px !important;
   padding: 12px 14px !important;
   text-align: center !important;
 }
 
 table td {
+  background: rgba(0, 0, 0, 0.01) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  color: #334155 !important; /* slate-700 */
+  padding: 12px 14px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.dark table th {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #94a3b8 !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  text-align: center !important;
+}
+
+.dark table td {
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 12px !important;
@@ -220,38 +240,27 @@ table td {
   backdrop-filter: blur(10px);
 }
 
-.dark table th {
-  background: rgba(255, 255, 255, 0.03) !important;
-  color: #94a3b8 !important;
-  border-color: rgba(255, 255, 255, 0.05) !important;
-}
-
-.dark table td {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  color: #e2e8f0 !important;
-}
-
 table tbody tr:hover td {
   background: rgba(56, 189, 248, 0.05) !important;
   border-color: rgba(56, 189, 248, 0.3) !important;
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 10px rgba(56, 189, 248, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02) !important;
 }
 
 .dark table tbody tr:hover td {
   background: rgba(56, 189, 248, 0.05) !important;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 10px rgba(56, 189, 248, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 10px rgba(56, 189, 248, 0.1) !important;
 }
 
 /* 3. Cell Grade Color Mapping using modern CSS :has() */
 table td:has(span.text-emerald-600),
+table td:has(span.text-emerald-50),
 table td:has(span.text-emerald-500),
 table td:has(span.bg-emerald-50),
 table td:has(span.bg-emerald-500\/10) {
-  background: rgba(16, 185, 129, 0.1) !important;
-  border: 1px solid rgba(16, 185, 129, 0.3) !important;
-  color: #34d399 !important;
+  background: rgba(16, 185, 129, 0.05) !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+  color: #059669 !important; /* dark emerald */
   text-align: center !important;
 }
 
@@ -260,9 +269,9 @@ table td:has(span.text-indigo-500),
 table td:has(span.text-indigo-600),
 table td:has(span.bg-indigo-50),
 table td:has(span.text-purple-650) {
-  background: rgba(139, 92, 246, 0.1) !important;
-  border: 1px solid rgba(139, 92, 246, 0.3) !important;
-  color: #a78bfa !important;
+  background: rgba(99, 102, 241, 0.05) !important;
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+  color: #4f46e5 !important; /* dark indigo */
   text-align: center !important;
 }
 
@@ -270,27 +279,71 @@ table td:has(span.text-amber-500),
 table td:has(span.text-amber-600),
 table td:has(span.text-amber-555),
 table td:has(span.bg-amber-50) {
-  background: rgba(245, 158, 11, 0.1) !important;
-  border: 1px solid rgba(245, 158, 11, 0.3) !important;
-  color: #fbbf24 !important;
+  background: rgba(245, 158, 11, 0.05) !important;
+  border: 1px solid rgba(245, 158, 11, 0.2) !important;
+  color: #b45309 !important; /* dark amber */
   text-align: center !important;
 }
 
 table td:has(span.text-rose-500),
 table td:has(span.text-rose-550),
 table td:has(span.bg-rose-50) {
-  background: rgba(239, 68, 68, 0.1) !important;
-  border: 1px solid rgba(239, 68, 68, 0.3) !important;
-  color: #f87171 !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  color: #dc2626 !important; /* dark red */
   text-align: center !important;
 }
 
 table td:has(span.text-slate-400),
 table td:has(span.text-slate-300) {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #94a3b8 !important;
+  background: rgba(0, 0, 0, 0.01) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  color: #475569 !important; /* dark slate */
   text-align: center !important;
+}
+
+.dark table td:has(span.text-emerald-600),
+.dark table td:has(span.text-emerald-550),
+.dark table td:has(span.text-emerald-500),
+.dark table td:has(span.bg-emerald-50),
+.dark table td:has(span.bg-emerald-500\/10) {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #34d399 !important;
+}
+
+.dark table td:has(span.text-indigo-650),
+.dark table td:has(span.text-indigo-500),
+.dark table td:has(span.text-indigo-600),
+.dark table td:has(span.bg-indigo-50),
+.dark table td:has(span.text-purple-650) {
+  background: rgba(139, 92, 246, 0.1) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  color: #a78bfa !important;
+}
+
+.dark table td:has(span.text-amber-500),
+.dark table td:has(span.text-amber-600),
+.dark table td:has(span.text-amber-555),
+.dark table td:has(span.bg-amber-50) {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+  color: #fbbf24 !important;
+}
+
+.dark table td:has(span.text-rose-500),
+.dark table td:has(span.text-rose-550),
+.dark table td:has(span.bg-rose-50) {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #f87171 !important;
+}
+
+.dark table td:has(span.text-slate-400),
+.dark table td:has(span.text-slate-300) {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #94a3b8 !important;
 }
 
 /* 4. Normalizing the inner grade badges to inherit layout/colors */
@@ -412,12 +465,12 @@ table td span.text-slate-300 {
 
 /* DASHBOARD NEON STYLES */
 .dark body {
-    background-color: #13131b !important;
+    background-color: #0f172a !important;
     background-image: none !important;
 }
 
 body {
-    background-color: #13131b !important;
+    background-color: #f8fafc !important;
     background-image: none !important;
 }
 
@@ -462,3 +515,177 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* STITCH CUSTOM STYLES */
+.card-level-1 {
+    box-shadow: 0px 4px 20px rgba(0,0,0,0.03);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+.dark .card-level-1 {
+    box-shadow: 0px 4px 20px rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.card-level-1:hover {
+    box-shadow: 0px 10px 30px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+    border: 1px solid rgba(0,0,0,0.08);
+}
+.dark .card-level-1:hover {
+    box-shadow: 0px 10px 30px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.icon-gradient-dashboard { background: linear-gradient(135deg, #FF3D71 0%, #BA0035 100%); }
+.icon-gradient-cursos { background: linear-gradient(135deg, #42A5F5 0%, #1976D2 100%); }
+.icon-gradient-estudiantes { background: linear-gradient(135deg, #66BB6A 0%, #388E3C 100%); }
+.icon-gradient-reportes { background: linear-gradient(135deg, #FFA726 0%, #F57C00 100%); }
+.icon-gradient-ajustes { background: linear-gradient(135deg, #78909C 0%, #455A64 100%); }
+
+/* GLOBAL LIGHT MODE TEXT AND BG OVERRIDES */
+html:not(.dark) .text-white,
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-250,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-slate-300 {
+  color: #1e293b !important;
+}
+
+/* Maintain white color inside buttons, badges, status indicators, and explicitly colored backgrounds */
+html:not(.dark) button .text-white,
+html:not(.dark) button.text-white,
+html:not(.dark) a.text-white,
+html:not(.dark) .bg-blue-600 .text-white,
+html:not(.dark) .bg-emerald-600 .text-white,
+html:not(.dark) .bg-rose-600 .text-white,
+html:not(.dark) .bg-\[\#ba0035\] .text-white,
+html:not(.dark) .bg-red-650 .text-white,
+html:not(.dark) .bg-red-600 .text-white,
+html:not(.dark) .bg-amber-500 .text-white,
+html:not(.dark) .bg-indigo-650 .text-white,
+html:not(.dark) .bg-indigo-600 .text-white,
+html:not(.dark) .bg-indigo-500 .text-white,
+html:not(.dark) .bg-purple-600 .text-white,
+html:not(.dark) .bg-purple-500 .text-white,
+html:not(.dark) .bg-blue-500 .text-white,
+html:not(.dark) .bg-emerald-500 .text-white,
+html:not(.dark) .bg-rose-500 .text-white,
+html:not(.dark) .bg-red-500 .text-white,
+html:not(.dark) .bg-amber-600 .text-white,
+html:not(.dark) .bg-gradient-to-r .text-white,
+html:not(.dark) .bg-gradient-to-tr .text-white,
+html:not(.dark) .bg-gradient-to-tr span,
+html:not(.dark) .bg-gradient-to-r span,
+html:not(.dark) .bg-blue-600 span,
+html:not(.dark) .bg-emerald-600 span,
+html:not(.dark) .bg-rose-600 span,
+html:not(.dark) .bg-\[\#ba0035\] span,
+html:not(.dark) .status-badge,
+html:not(.dark) .badge,
+html:not(.dark) .pill-style,
+html:not(.dark) [class*="bg-blue-"] .text-white,
+html:not(.dark) [class*="bg-emerald-"] .text-white,
+html:not(.dark) [class*="bg-rose-"] .text-white,
+html:not(.dark) [class*="bg-red-"] .text-white,
+html:not(.dark) [class*="bg-indigo-"] .text-white,
+html:not(.dark) [class*="bg-purple-"] .text-white,
+html:not(.dark) [class*="bg-amber-"] .text-white,
+html:not(.dark) th.text-white {
+  color: #ffffff !important;
+}
+
+/* Background overrides for dark-coded sections */
+html:not(.dark) .bg-\[\#060a14\] {
+  background-color: #f8fafc !important;
+}
+html:not(.dark) .bg-\[\#0b1326\] {
+  background-color: #f8fafc !important;
+}
+html:not(.dark) .bg-\[\#0B1021\]\/95 {
+  background-color: rgba(248, 250, 252, 0.95) !important;
+}
+html:not(.dark) .bg-\[\#0f172a\] {
+  background-color: #ffffff !important;
+}
+html:not(.dark) .bg-\[\#131B2F\] {
+  background-color: #f1f5f9 !important;
+}
+
+/* Form inputs & selectors readability */
+html:not(.dark) input,
+html:not(.dark) select,
+html:not(.dark) textarea {
+  color: #0f172a !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: #cbd5e1 !important;
+}
+html:not(.dark) option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+html:not(.dark) input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Soft shadows for active items in list-cards and glass-cards */
+html:not(.dark) .glass-card-ecc,
+html:not(.dark) .glass-card {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02) !important;
+  color: #1e293b !important;
+}
+
+/* Colorized Grading Cells - Peru Literals (Strong text, Pastel / Gradient background) */
+.cell-grade-ad {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+  color: #1e40af !important;
+  border-color: #bfdbfe !important;
+  font-weight: 900 !important;
+}
+.dark .cell-grade-ad {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.45) 0%, rgba(29, 78, 216, 0.2) 100%) !important;
+  color: #93c5fd !important;
+  border-color: rgba(96, 165, 250, 0.3) !important;
+  font-weight: 900 !important;
+}
+
+.cell-grade-a {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+  font-weight: 900 !important;
+}
+.dark .cell-grade-a {
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(4, 120, 87, 0.2) 100%) !important;
+  color: #a7f3d0 !important;
+  border-color: rgba(52, 211, 153, 0.3) !important;
+  font-weight: 900 !important;
+}
+
+.cell-grade-b {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+  font-weight: 900 !important;
+}
+.dark .cell-grade-b {
+  background: linear-gradient(135deg, rgba(120, 53, 4, 0.45) 0%, rgba(180, 83, 9, 0.2) 100%) !important;
+  color: #fde68a !important;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+  font-weight: 900 !important;
+}
+
+.cell-grade-c {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%) !important;
+  color: #be123c !important;
+  border-color: #fecdd3 !important;
+  font-weight: 900 !important;
+}
+.dark .cell-grade-c {
+  background: linear-gradient(135deg, rgba(136, 19, 55, 0.45) 0%, rgba(190, 18, 60, 0.2) 100%) !important;
+  color: #fecdd3 !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+  font-weight: 900 !important;
+}
+
+

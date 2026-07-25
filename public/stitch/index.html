@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visualizador Stitch - Edulumina Academic Suite</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'Outfit', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              navy: '#0b1c30',
+              raspberry: '#ba0035',
+              glow: '#3b82f6',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #030712;
+      color: #f3f4f6;
+    }
+    .glass {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-input {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #030712;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f2937;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+    iframe {
+      background-color: white;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .device-mobile {
+      width: 375px !important;
+      height: 700px !important;
+      border-radius: 36px;
+      border: 12px solid #1f2937;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .device-tablet {
+      width: 768px !important;
+      height: 900px !important;
+      border-radius: 24px;
+      border: 12px solid #1f2937;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .device-desktop {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 0px;
+      border: 0px;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col font-sans">
+
+  <!-- Header -->
+  <header class="h-16 shrink-0 flex items-center justify-between px-6 border-b border-white/5 glass z-50">
+    <div class="flex items-center gap-3">
+      <div class="h-9 w-9 bg-gradient-to-tr from-brand-raspberry to-brand-glow rounded-xl flex items-center justify-center shadow-lg shadow-brand-glow/10">
+        <span class="material-symbols-outlined text-white text-xl">auto_stories</span>
+      </div>
+      <div>
+        <h1 class="text-base font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+          Edulumina Academic Suite
+        </h1>
+        <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest -mt-0.5">Visualizador de Propuestas de Diseño (Stitch)</p>
+      </div>
+    </div>
+
+    <!-- Active Screen Controls -->
+    <div class="flex items-center gap-4">
+      <!-- Resolution Controls -->
+      <div id="deviceControls" class="hidden flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5 text-xs font-semibold">
+        <button onclick="setDevice('mobile')" id="btn-mobile" class="px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-base">smartphone</span>
+          <span class="hidden sm:inline">Móvil</span>
+        </button>
+        <button onclick="setDevice('tablet')" id="btn-tablet" class="px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-base">tablet</span>
+          <span class="hidden sm:inline">Tablet</span>
+        </button>
+        <button onclick="setDevice('desktop')" id="btn-desktop" class="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white transition flex items-center gap-1 shadow-sm">
+          <span class="material-symbols-outlined text-base">desktop_windows</span>
+          <span class="hidden sm:inline">Escritorio</span>
+        </button>
+      </div>
+
+      <!-- View Toggles -->
+      <div id="viewControls" class="hidden flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5 text-xs font-semibold">
+        <button onclick="setViewMode('split')" id="btn-split" class="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-base">dashboard</span>
+          <span class="hidden sm:inline">Dividido</span>
+        </button>
+        <button onclick="setViewMode('live')" id="btn-live" class="px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-base">open_in_browser</span>
+          <span class="hidden sm:inline">Interactivo</span>
+        </button>
+        <button onclick="setViewMode('mock')" id="btn-mock" class="px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-base">image</span>
+          <span class="hidden sm:inline">Diseño</span>
+        </button>
+      </div>
+
+      <!-- Open direct link button -->
+      <a href="#" id="directLinkBtn" target="_blank" class="hidden px-3.5 py-2 rounded-xl bg-gradient-to-r from-brand-raspberry to-red-600 text-white text-xs font-bold shadow-md shadow-brand-raspberry/20 hover:shadow-brand-raspberry/45 hover:scale-[1.02] active:scale-95 transition flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">open_in_new</span>
+        <span>Pantalla Completa</span>
+      </a>
+
+      <!-- Back to main app -->
+      <a href="/" class="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 text-xs font-bold transition flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        <span>Ir a SIGGESMAFI</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Body -->
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="w-80 shrink-0 border-r border-white/5 glass flex flex-col z-40">
+      <div class="p-4 border-b border-white/5 flex items-center gap-2">
+        <span class="material-symbols-outlined text-gray-400 text-lg">search</span>
+        <input type="text" id="searchInput" oninput="filterScreens()" placeholder="Buscar propuesta..." class="w-full text-xs font-semibold bg-transparent border-0 outline-none p-0 focus:ring-0 placeholder-gray-500 text-white" />
+      </div>
+
+      <!-- Categories Container -->
+      <div id="sidebarMenu" class="flex-1 overflow-y-auto p-4 space-y-6">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Design system file download/preview info -->
+      <div class="p-4 border-t border-white/5 bg-black/40">
+        <button onclick="showDesignSpec()" class="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 hover:text-white transition flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-base">palette</span>
+          <span>Ver Especificación DESIGN.md</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Content Workspace -->
+    <main class="flex-1 overflow-hidden relative flex flex-col bg-gray-950">
+      <!-- Design Spec Overlay modal -->
+      <div id="specModal" class="hidden absolute inset-0 z-50 p-6 flex flex-col bg-gray-950/95 backdrop-blur-xl">
+        <div class="flex items-center justify-between pb-4 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-yellow-500">palette</span>
+            <h2 class="text-lg font-bold text-white">Especificación de Diseño (DESIGN.md)</h2>
+          </div>
+          <button onclick="closeDesignSpec()" class="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div id="specContent" class="flex-1 overflow-y-auto py-4 text-sm text-gray-300 leading-relaxed font-mono whitespace-pre-wrap">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+      <!-- App State Placeholder -->
+      <div id="welcomePlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-10">
+        <span class="material-symbols-outlined text-6xl text-gray-600 animate-pulse mb-4">tab_unselected</span>
+        <h2 class="text-xl font-bold text-white mb-2">Visualizador de Pantallas Stitch</h2>
+        <p class="text-sm text-gray-400 max-w-md">
+          Selecciona una propuesta del menú lateral para previsualizar el código interactivo o compararlo con el diseño original.
+        </p>
+      </div>
+
+      <!-- Preview Panels Container -->
+      <div id="previewContainer" class="hidden flex-1 flex overflow-hidden">
+        
+        <!-- Live App Panel -->
+        <div id="livePanel" class="flex-1 flex flex-col justify-center items-center p-4 border-r border-white/5 relative bg-slate-900/10">
+          <!-- Floating label -->
+          <div class="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-blue-600/90 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
+            Live Demo (Interactive)
+          </div>
+          <div class="w-full h-full flex items-center justify-center overflow-auto relative">
+            <iframe id="previewIframe" src="" class="device-desktop w-full h-full border-0"></iframe>
+          </div>
+        </div>
+
+        <!-- Mockup Image Panel -->
+        <div id="mockPanel" class="w-1/2 shrink-0 flex flex-col justify-center items-center p-4 relative bg-black/40">
+          <!-- Floating label -->
+          <div class="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-brand-raspberry/90 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
+            Original Mockup (Design)
+          </div>
+          <div class="w-full h-full flex items-center justify-center overflow-hidden">
+            <img id="mockImage" src="" alt="Screenshot" class="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/10" />
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Javascript Data and Logic -->
+  <script>
+    // Categories and Screens map
+    const categories = [
+      {
+        id: 'acceso',
+        name: 'Acceso al Sistema',
+        icon: 'login',
+        screens: [
+          { id: 'acceso_al_sistema_educore', name: 'Acceso EduCore (Estándar)' },
+          { id: 'acceso_al_sistema_educore_premium', name: 'Acceso EduCore Premium' },
+          { id: 'acceso_al_sistema_estilo_sisgesmafi_dark', name: 'Acceso Dark - Sisgesmafi' }
+        ]
+      },
+      {
+        id: 'dashboard',
+        name: 'Dashboard / Control',
+        icon: 'dashboard',
+        screens: [
+          { id: 'panel_de_control_administrativo', name: 'Panel de Control Administrativo' },
+          { id: 'panel_de_control_iconograf_a_colorida', name: 'Panel con Iconografía Colorida' },
+          { id: 'dashboard_estilo_visual_personalizado', name: 'Estilo Visual Personalizado' },
+          { id: 'dashboard_administrativo_estilo_sisgesmafi_dark_1', name: 'Admin Dark - Sisgesmafi 1' },
+          { id: 'dashboard_administrativo_estilo_sisgesmafi_dark_2', name: 'Admin Dark - Sisgesmafi 2' },
+          { id: 'dashboard_administrativo_versi_n_final', name: 'Dashboard Administrativo (FINAL)', isFinal: true }
+        ]
+      },
+      {
+        id: 'aula',
+        name: 'Gestión de Aula',
+        icon: 'groups',
+        screens: [
+          { id: 'gesti_n_de_aula_detallada_estilo_sisgesmafi_1', name: 'Aula Detallada - Sisgesmafi 1' },
+          { id: 'gesti_n_de_aula_detallada_estilo_sisgesmafi_2', name: 'Aula Detallada - Sisgesmafi 2' },
+          { id: 'gesti_n_de_aula_versi_n_final', name: 'Gestión de Aula (FINAL)', isFinal: true }
+        ]
+      },
+      {
+        id: 'estudiantes',
+        name: 'Gestión de Estudiantes',
+        icon: 'school',
+        screens: [
+          { id: 'gesti_n_de_estudiantes_iconos_coloridos_1', name: 'Estudiantes Iconos Coloridos 1' },
+          { id: 'gesti_n_de_estudiantes_iconos_coloridos_2', name: 'Estudiantes Iconos Coloridos 2' },
+          { id: 'gesti_n_de_estudiantes_navegaci_n_actualizada', name: 'Navegación Actualizada' },
+          { id: 'gesti_n_de_estudiantes_y_documentaci_n', name: 'Estudiantes & Documentación' },
+          { id: 'gesti_n_de_estudiantes_versi_n_final', name: 'Gestión de Estudiantes (FINAL)', isFinal: true }
+        ]
+      },
+      {
+        id: 'calificaciones',
+        name: 'Calificaciones',
+        icon: 'grade',
+        screens: [
+          { id: 'gesti_n_de_calificaciones_iconos_coloridos_1', name: 'Calificaciones Iconos Coloridos 1' },
+          { id: 'gesti_n_de_calificaciones_iconos_coloridos_2', name: 'Calificaciones Iconos Coloridos 2' },
+          { id: 'gesti_n_de_calificaciones_por_instrumentos', name: 'Calificaciones por Instrumentos' },
+          { id: 'gesti_n_de_calificaciones_navegaci_n_actualizada', name: 'Navegación Actualizada' },
+          { id: 'gesti_n_de_calificaciones_versi_n_final', name: 'Calificaciones (FINAL)', isFinal: true }
+        ]
+      }
+    ];
+
+    let activeScreenId = null;
+    let currentDevice = 'desktop'; // desktop, tablet, mobile
+    let currentViewMode = 'split'; // split, live, mock
+
+    // Load Sidebar
+    function renderSidebar() {
+      const menu = document.getElementById('sidebarMenu');
+      menu.innerHTML = '';
+
+      categories.forEach(cat => {
+        const catDiv = document.createElement('div');
+        catDiv.className = 'space-y-2';
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'flex items-center gap-2 text-gray-500 font-bold text-[10px] uppercase tracking-wider mb-2';
+        titleDiv.innerHTML = `
+          <span class="material-symbols-outlined text-sm">${cat.icon}</span>
+          <span>${cat.name}</span>
+        `;
+        catDiv.appendChild(titleDiv);
+
+        const list = document.createElement('div');
+        list.className = 'space-y-1 pl-1';
+
+        cat.screens.forEach(screen => {
+          const btn = document.createElement('button');
+          btn.onclick = () => selectScreen(screen.id);
+          btn.id = `btn-screen-${screen.id}`;
+          btn.className = `w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition group hover:bg-white/5 text-gray-400 hover:text-white`;
+          
+          let tagHtml = '';
+          if (screen.isFinal) {
+            tagHtml = `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[8px] font-black tracking-wide uppercase">FINAL</span>`;
+          }
+
+          btn.innerHTML = `
+            <span class="truncate pr-2">${screen.name}</span>
+            ${tagHtml}
+          `;
+          list.appendChild(btn);
+        });
+
+        catDiv.appendChild(list);
+        menu.appendChild(catDiv);
+      });
+    }
+
+    // Filter Screens
+    function filterScreens() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const btns = document.querySelectorAll('[id^="btn-screen-"]');
+      
+      categories.forEach(cat => {
+        cat.screens.forEach(screen => {
+          const btn = document.getElementById(`btn-screen-${screen.id}`);
+          if (screen.name.toLowerCase().includes(q) || cat.name.toLowerCase().includes(q)) {
+            btn.style.display = 'flex';
+          } else {
+            btn.style.display = 'none';
+          }
+        });
+      });
+    }
+
+    // Select Screen
+    function selectScreen(id) {
+      if (activeScreenId) {
+        const prevBtn = document.getElementById(`btn-screen-${activeScreenId}`);
+        if (prevBtn) {
+          prevBtn.classList.remove('bg-white/10', 'text-white', 'border-l-2', 'border-blue-500', 'pl-2.5');
+          prevBtn.classList.add('text-gray-400');
+        }
+      }
+
+      activeScreenId = id;
+      const btn = document.getElementById(`btn-screen-${id}`);
+      if (btn) {
+        btn.classList.add('bg-white/10', 'text-white', 'border-l-2', 'border-blue-500', 'pl-2.5');
+        btn.classList.remove('text-gray-400');
+      }
+
+      // Hide placeholder
+      document.getElementById('welcomePlaceholder').style.display = 'none';
+      document.getElementById('previewContainer').style.display = 'flex';
+
+      // Show topbar elements
+      document.getElementById('deviceControls').style.display = 'flex';
+      document.getElementById('viewControls').style.display = 'flex';
+      document.getElementById('directLinkBtn').style.display = 'flex';
+
+      // Load Iframe and Image paths
+      const iframe = document.getElementById('previewIframe');
+      const img = document.getElementById('mockImage');
+      const directBtn = document.getElementById('directLinkBtn');
+
+      const iframeSrc = `./${id}/code.html`;
+      const imgSrc = `./${id}/screen.png`;
+
+      iframe.src = iframeSrc;
+      img.src = imgSrc;
+      directBtn.href = iframeSrc;
+
+      // Update layout based on current modes
+      applyViewLayout();
+    }
+
+    // Device Resolution
+    function setDevice(device) {
+      currentDevice = device;
+      
+      // Reset buttons
+      ['mobile', 'tablet', 'desktop'].forEach(d => {
+        const btn = document.getElementById(`btn-${d}`);
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1';
+      });
+
+      const activeBtn = document.getElementById(`btn-${device}`);
+      activeBtn.className = 'px-2.5 py-1.5 rounded-lg bg-blue-600 text-white transition flex items-center gap-1 shadow-sm';
+
+      const iframe = document.getElementById('previewIframe');
+      iframe.className = '';
+      
+      if (device === 'mobile') {
+        iframe.classList.add('device-mobile');
+      } else if (device === 'tablet') {
+        iframe.classList.add('device-tablet');
+      } else {
+        iframe.classList.add('device-desktop');
+      }
+    }
+
+    // View Mode
+    function setViewMode(mode) {
+      currentViewMode = mode;
+
+      // Reset buttons
+      ['split', 'live', 'mock'].forEach(m => {
+        const btn = document.getElementById(`btn-${m}`);
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1';
+      });
+
+      const activeBtn = document.getElementById(`btn-${mode}`);
+      activeBtn.className = 'px-2.5 py-1.5 rounded-lg bg-blue-600 text-white transition flex items-center gap-1 shadow-sm';
+
+      applyViewLayout();
+    }
+
+    // Apply View Layout
+    function applyViewLayout() {
+      const livePanel = document.getElementById('livePanel');
+      const mockPanel = document.getElementById('mockPanel');
+
+      if (currentViewMode === 'split') {
+        livePanel.style.display = 'flex';
+        mockPanel.style.display = 'flex';
+        mockPanel.className = 'w-1/2 shrink-0 flex flex-col justify-center items-center p-4 relative bg-black/40';
+      } else if (currentViewMode === 'live') {
+        livePanel.style.display = 'flex';
+        mockPanel.style.display = 'none';
+      } else {
+        livePanel.style.display = 'none';
+        mockPanel.style.display = 'flex';
+        mockPanel.className = 'flex-1 flex flex-col justify-center items-center p-4 relative bg-black/40';
+      }
+    }
+
+    // Design Spec Modal
+    function showDesignSpec() {
+      const modal = document.getElementById('specModal');
+      const content = document.getElementById('specContent');
+      
+      if (content.innerHTML.trim() === '') {
+        content.innerHTML = 'Cargando DESIGN.md...';
+        fetch('./lumina_academic/DESIGN.md')
+          .then(res => res.text())
+          .then(text => {
+            content.textContent = text;
+          })
+          .catch(err => {
+            content.textContent = 'Error cargando DESIGN.md: ' + err.message;
+          });
+      }
+      modal.classList.remove('hidden');
+    }
+
+    function closeDesignSpec() {
+      document.getElementById('specModal').classList.add('hidden');
+    }
+
+    // Init
+    window.onload = () => {
+      renderSidebar();
+    };
+  </script>
+</body>
+</html>

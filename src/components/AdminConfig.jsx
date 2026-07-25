@@ -1,6 +1,7 @@
 import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { Settings, ShieldAlert, CheckCircle2, Info, Database, UserCircle } from 'lucide-react';
+import { buildEvaluationHealthReport } from '../utils/evaluationAccess';
 
 function AdminConfig() {
   const { 
@@ -14,6 +15,8 @@ function AdminConfig() {
     teachers,
     courses,
     grades,
+    evaluations,
+    restoreLastDeletedEvaluation,
     activePeriods,
     saveActivePeriods
   } = useContext(DatabaseContext);
@@ -63,14 +66,36 @@ function AdminConfig() {
     ];
   }, [students, teachers, courses, grades]);
 
+  const healthReport = useMemo(() => buildEvaluationHealthReport({
+    evaluations,
+    grades,
+    students
+  }), [evaluations, grades, students]);
+
   return (
     <div className="space-y-6">
       
-      {/* Intro Header */}
-      <div>
-        <h2 className="text-3xl font-extrabold tracking-tight">Consola del Administrador</h2>
-        <p className="text-slate-400 mt-1">Configuración general de la cuenta, parámetros pedagógicos y auditoría de base de datos.</p>
-      </div>
+      {/* Module Header Banner (Full Width 3D) */}
+      <section className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-5 text-left relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#e11d48]/5 rounded-full blur-2xl pointer-events-none" />
+        <style>{`
+          .emoji-3d-header {
+            font-size: 2.25rem;
+            line-height: 1;
+            display: inline-block;
+            filter: drop-shadow(0 1px 0 #fca5a5)
+                    drop-shadow(0 2px 0 #f43f5e)
+                    drop-shadow(0 3px 0 #e11d48)
+                    drop-shadow(0 5px 6px rgba(225, 29, 72, 0.3));
+            transform: scale(1.05);
+          }
+        `}</style>
+        <span className="emoji-3d-header shrink-0">⚙️</span>
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">Consola del Administrador</h2>
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">Configuración general de la cuenta, parámetros pedagógicos y auditoría de base de datos.</p>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -267,6 +292,31 @@ function AdminConfig() {
                   <p className="text-[9px] uppercase font-bold text-slate-400 mt-0.5">{stat.name}</p>
                 </div>
               ))}
+            </div>
+            <div className="border-t border-white/10 pt-3 space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Salud e integridad</p>
+              {[
+                ['Instrumentos históricos sin propietario', healthReport.legacyWithoutOwner],
+                ['Instrumentos sin sección', healthReport.evaluationsWithoutSection],
+                ['Posibles duplicados', healthReport.duplicateEvaluations],
+                ['Notas sin instrumento', healthReport.orphanGrades],
+                ['Notas sin estudiante', healthReport.gradesWithoutStudent]
+              ].map(([label, count]) => (
+                <div key={label} className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-400">{label}</span>
+                  <span className={`font-black ${count > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{count}</span>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={async () => {
+                  const result = await restoreLastDeletedEvaluation();
+                  alert(result.message);
+                }}
+                className="w-full mt-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-[10px] font-black uppercase text-indigo-300 hover:bg-indigo-500/20 transition"
+              >
+                Restaurar último instrumento eliminado
+              </button>
             </div>
           </div>
 

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Registro de Calificaciones - EduCore</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline": "#74777d",
+                    "secondary-fixed": "#ffdada",
+                    "tertiary": "#000000",
+                    "on-secondary-fixed": "#40000c",
+                    "tertiary-container": "#321115",
+                    "primary-fixed": "#d3e3ff",
+                    "on-surface-variant": "#44474d",
+                    "on-error": "#ffffff",
+                    "surface-container-low": "#f3f3f4",
+                    "module-blue": "#3B82F6",
+                    "on-tertiary": "#ffffff",
+                    "surface-tint": "#505f76",
+                    "inverse-surface": "#2f3131",
+                    "text-muted": "#5C647A",
+                    "primary-fixed-dim": "#b7c7e2",
+                    "surface-variant": "#e2e2e2",
+                    "inverse-on-surface": "#f0f1f1",
+                    "on-primary-fixed-variant": "#38485e",
+                    "background": "#f9f9f9",
+                    "secondary": "#ba0035",
+                    "on-primary": "#ffffff",
+                    "module-orange": "#F97316",
+                    "on-secondary": "#ffffff",
+                    "secondary-container": "#e21e49",
+                    "on-tertiary-fixed-variant": "#653b3f",
+                    "outline-variant": "#c4c6cd",
+                    "module-green": "#10B981",
+                    "primary-container": "#0b1c30",
+                    "on-error-container": "#93000a",
+                    "on-background": "#1a1c1c",
+                    "primary": "#000000",
+                    "on-primary-container": "#75859d",
+                    "secondary-fixed-dim": "#ffb3b6",
+                    "on-secondary-fixed-variant": "#920028",
+                    "on-surface": "#1a1c1c",
+                    "on-primary-fixed": "#0b1c30",
+                    "surface-subtle": "#F8FAFC",
+                    "surface-container-highest": "#e2e2e2",
+                    "surface-dim": "#dadada",
+                    "surface-container-high": "#e8e8e8",
+                    "inverse-primary": "#b7c7e2",
+                    "surface-container-lowest": "#ffffff",
+                    "tertiary-fixed": "#ffdadc",
+                    "module-yellow": "#F59E0B",
+                    "error-container": "#ffdad6",
+                    "surface-bright": "#f9f9f9",
+                    "on-tertiary-fixed": "#321115",
+                    "surface": "#f9f9f9",
+                    "on-secondary-container": "#fffbff",
+                    "tertiary-fixed-dim": "#f3b7bc",
+                    "on-tertiary-container": "#aa767b",
+                    "surface-container": "#eeeeee",
+                    "error": "#ba1a1a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "container-max": "1280px",
+                    "gutter": "24px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "headline-xl": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .grade-input:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+      }
+      /* Custom scrollbar for horizontal table */
+      .custom-scrollbar::-webkit-scrollbar {
+        height: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #c4c6cd;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #74777d;
+      }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full flex flex-col py-6 border-r border-outline-variant bg-surface w-64 rounded-r-xl shadow-md z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">EduCore LMS</h1>
+<p class="text-label-sm text-on-surface-variant">Panel Administrativo</p>
+</div>
+<nav class="flex-1 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg px-4 py-2 mx-2 transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center gap-3 bg-secondary text-on-secondary rounded-lg px-4 py-2 mx-2 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="school">school</span> Cursos
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg px-4 py-2 mx-2 transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span> Estudiantes
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg px-4 py-2 mx-2 transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span> Reportes
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg px-4 py-2 mx-2 transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span> Ajustes
+            </a>
+</nav>
+<div class="mt-auto px-2 space-y-1">
+<button class="w-full mb-4 bg-secondary text-on-secondary rounded-lg py-2 font-label-md text-label-md hover:scale-95 transition-transform">
+                Nuevo Curso
+            </button>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg px-4 py-2 transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span> Ayuda
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg px-4 py-2 transition-colors font-label-md text-label-md text-secondary" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span> Cerrar Sesión
+            </a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 flex-1 flex flex-col min-h-screen">
+<!-- TopNavBar (Shared Component) -->
+<header class="flex justify-between items-center w-full px-margin-desktop py-4 sticky top-0 z-40 bg-surface-container-lowest shadow-sm">
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container border-none rounded-full w-64 focus:ring-2 focus:ring-primary text-label-md" placeholder="Buscar estudiante o curso..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-surface-container text-on-surface-variant transition-transform hover:scale-105">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-container text-on-surface-variant transition-transform hover:scale-105">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-10 w-10 rounded-full bg-primary-fixed overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a female university administrator with a warm smile, wearing modern glasses and professional business attire. The background is a blurred high-end academic office with soft natural lighting, following a clean and modern educational aesthetic with neutral tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuChcKcCQS0OgzSNG0vHmLe7XMdaQQ1sfujfp-RxW_vt3kBjDkZXYd3GPIhRvg5HdxWyXrMmTFPZWUm1AdjqSd8E2WeOW6aP6ae2gqWSxBguRTzMjytCgThel5SX9mzEOhh71ZHO7UIZHNN4sMQK4fPMh-TEHP7OkGDvVAyQZUtQuLhCb-URfnOzQLGHGd6CCNEF1AYs9G1vzF3vx4rHrzzBk-gKMyNHnUlsgsq5GBjFGBHlhFpqu-pY4w5dWKUNZCWKnIscMTy9Rjs"/>
+</div>
+</div>
+</header>
+<!-- Canvas Content -->
+<div class="p-margin-desktop space-y-gutter flex-1">
+<!-- Page Header & Toolbar -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<nav class="flex text-label-sm text-text-muted gap-2 mb-2">
+<span>Cursos</span>
+<span>/</span>
+<span>Arquitectura de Software</span>
+<span>/</span>
+<span class="text-primary font-bold">Registro de Calificaciones</span>
+</nav>
+<h2 class="font-headline-lg text-headline-lg text-primary">Evaluación Continua: Unidad II</h2>
+<p class="text-body-md text-on-surface-variant">Gestión de calificaciones por instrumentos de evaluación.</p>
+</div>
+<div class="flex flex-wrap gap-3">
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-xl bg-surface hover:bg-surface-container-high transition-all text-label-md">
+<span class="material-symbols-outlined text-module-green" data-icon="upload_file">upload_file</span> Importar Excel
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-xl bg-surface hover:bg-surface-container-high transition-all text-label-md">
+<span class="material-symbols-outlined text-secondary" data-icon="download">download</span> Exportar
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-xl hover:scale-105 transition-all text-label-md shadow-md" onclick="toggleModal('modal-config')">
+<span class="material-symbols-outlined" data-icon="tune">tune</span> Configurar Criterios
+                    </button>
+</div>
+</section>
+<!-- Tool Selector (Instrument Selection) -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<button class="instrument-card p-6 bg-surface-container-lowest rounded-xl shadow-sm border-l-4 border-module-blue flex items-center gap-4 hover:shadow-md transition-all text-left" id="btn-rubrica" onclick="selectInstrument('rubrica')">
+<div class="h-12 w-12 rounded-lg bg-module-blue/10 text-module-blue flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="rule">rule</span>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-primary">Rúbrica</h4>
+<p class="text-label-sm text-on-surface-variant">Evaluación por niveles</p>
+</div>
+</button>
+<button class="instrument-card p-6 bg-surface-container-lowest rounded-xl shadow-sm border-l-4 border-module-orange flex items-center gap-4 hover:shadow-md transition-all text-left opacity-60" id="btn-cotejo" onclick="selectInstrument('cotejo')">
+<div class="h-12 w-12 rounded-lg bg-module-orange/10 text-module-orange flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="checklist">checklist</span>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-primary">Lista de Cotejo</h4>
+<p class="text-label-sm text-on-surface-variant">Binario (Cumple/No)</p>
+</div>
+</button>
+<button class="instrument-card p-6 bg-surface-container-lowest rounded-xl shadow-sm border-l-4 border-module-green flex items-center gap-4 hover:shadow-md transition-all text-left opacity-60" id="btn-examen" onclick="selectInstrument('examen')">
+<div class="h-12 w-12 rounded-lg bg-module-green/10 text-module-green flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-primary">Examen Clásico</h4>
+<p class="text-label-sm text-on-surface-variant">Puntaje acumulativo</p>
+</div>
+</button>
+</section>
+<!-- Main Grade Table Container -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-subtle">
+<div class="flex items-center gap-4">
+<h3 class="font-headline-md text-headline-md text-primary">Estudiantes Registrados</h3>
+<span class="px-3 py-1 bg-primary-fixed text-primary font-label-sm text-label-sm rounded-full">Sección A-102</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-label-sm text-on-surface-variant">Promedio General:</span>
+<span class="text-headline-md font-bold text-module-blue">14.8</span>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full border-collapse">
+<thead>
+<tr class="bg-surface text-left">
+<th class="p-4 font-label-md text-label-md text-on-surface-variant sticky left-0 bg-surface z-10 w-64 border-r border-outline-variant">Nombre del Estudiante</th>
+<th class="p-4 font-label-md text-label-md text-on-surface-variant border-r border-outline-variant text-center w-24">C1 (25%)<br/><span class="text-[10px] font-normal">Análisis</span></th>
+<th class="p-4 font-label-md text-label-md text-on-surface-variant border-r border-outline-variant text-center w-24">C2 (35%)<br/><span class="text-[10px] font-normal">Diseño</span></th>
+<th class="p-4 font-label-md text-label-md text-on-surface-variant border-r border-outline-variant text-center w-24">C3 (20%)<br/><span class="text-[10px] font-normal">Docs</span></th>
+<th class="p-4 font-label-md text-label-md text-on-surface-variant border-r border-outline-variant text-center w-24">C4 (20%)<br/><span class="text-[10px] font-normal">Defensa</span></th>
+<th class="p-4 font-label-md text-label-md text-on-surface-variant text-center w-32 bg-primary-container text-on-primary-fixed">PROMEDIO</th>
+<th class="p-4 font-label-md text-label-md text-on-surface-variant text-center w-32">ESTADO</th>
+<th class="p-4 font-label-md text-label-md text-on-surface-variant text-center w-16"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Student Row 1 -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="p-4 font-body-md text-body-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container z-10 border-r border-outline-variant">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary font-bold text-xs">AA</div>
+<span>Alvarado, Andrea</span>
+</div>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="18"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="16"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="15"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="19"/>
+</td>
+<td class="p-4 text-center font-bold text-primary bg-primary-fixed/30">16.8</td>
+<td class="p-4 text-center">
+<span class="px-3 py-1 bg-module-green/10 text-module-green text-label-sm rounded-full font-bold">APROBADO</span>
+</td>
+<td class="p-4 text-center">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Student Row 2 -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="p-4 font-body-md text-body-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container z-10 border-r border-outline-variant">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-xs">BC</div>
+<span>Bermudez, Carlos</span>
+</div>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary text-secondary" type="number" value="08"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary text-secondary" type="number" value="10"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="12"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary text-secondary" type="number" value="09"/>
+</td>
+<td class="p-4 text-center font-bold text-secondary bg-secondary-fixed/30">09.7</td>
+<td class="p-4 text-center">
+<span class="px-3 py-1 bg-secondary/10 text-secondary text-label-sm rounded-full font-bold">DESAPROBADO</span>
+</td>
+<td class="p-4 text-center">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Student Row 3 -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="p-4 font-body-md text-body-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container z-10 border-r border-outline-variant">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-module-orange/20 flex items-center justify-center text-module-orange font-bold text-xs">LM</div>
+<span>López, Mariana</span>
+</div>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="14"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="15"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="13"/>
+</td>
+<td class="p-4 text-center border-r border-outline-variant">
+<input class="grade-input w-16 p-1 text-center border border-outline-variant rounded-lg bg-surface-subtle focus:border-primary" type="number" value="14"/>
+</td>
+<td class="p-4 text-center font-bold text-primary bg-primary-fixed/30">14.1</td>
+<td class="p-4 text-center">
+<span class="px-3 py-1 bg-module-green/10 text-module-green text-label-sm rounded-full font-bold">APROBADO</span>
+</td>
+<td class="p-4 text-center">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 bg-surface flex justify-between items-center text-label-sm text-on-surface-variant">
+<p>Mostrando 3 de 28 estudiantes</p>
+<div class="flex gap-2">
+<button class="px-3 py-1 border border-outline-variant rounded bg-surface hover:bg-surface-container-high transition-all">Anterior</button>
+<button class="px-3 py-1 bg-primary text-on-primary rounded transition-all">1</button>
+<button class="px-3 py-1 border border-outline-variant rounded bg-surface hover:bg-surface-container-high transition-all">2</button>
+<button class="px-3 py-1 border border-outline-variant rounded bg-surface hover:bg-surface-container-high transition-all">Siguiente</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Modal: Configuración de Criterios -->
+<div class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center backdrop-blur-sm p-4" id="modal-config">
+<div class="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-primary">Configurar Criterios de Evaluación</h3>
+<button class="text-on-surface-variant hover:text-secondary transition-colors" onclick="toggleModal('modal-config')">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<div class="p-6 space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="font-label-md text-label-md">Nombre del Criterio</label>
+<input class="w-full border border-outline-variant rounded-xl p-2 focus:ring-2 focus:ring-primary outline-none" placeholder="Ej. Análisis de Requisitos" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="font-label-md text-label-md">Peso (%)</label>
+<input class="w-full border border-outline-variant rounded-xl p-2 focus:ring-2 focus:ring-primary outline-none" placeholder="25" type="number"/>
+</div>
+</div>
+<div class="space-y-2">
+<label class="font-label-md text-label-md">Descripción detallada</label>
+<textarea class="w-full border border-outline-variant rounded-xl p-2 focus:ring-2 focus:ring-primary outline-none" placeholder="Define qué se evaluará en este criterio..." rows="3"></textarea>
+</div>
+<div class="border-t border-outline-variant pt-6">
+<h4 class="font-label-md text-label-md mb-4">Criterios Actuales</h4>
+<div class="space-y-2">
+<div class="flex items-center justify-between p-3 bg-surface rounded-xl border border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="w-8 h-8 bg-module-blue/10 text-module-blue rounded-full flex items-center justify-center font-bold text-xs">25%</span>
+<span class="font-body-md">Análisis y Comprensión</span>
+</div>
+<div class="flex gap-2">
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined" data-icon="edit">edit</span></button>
+<button class="text-on-surface-variant hover:text-secondary"><span class="material-symbols-outlined" data-icon="delete">delete</span></button>
+</div>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface rounded-xl border border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="w-8 h-8 bg-module-orange/10 text-module-orange rounded-full flex items-center justify-center font-bold text-xs">35%</span>
+<span class="font-body-md">Diseño de Arquitectura</span>
+</div>
+<div class="flex gap-2">
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined" data-icon="edit">edit</span></button>
+<button class="text-on-surface-variant hover:text-secondary"><span class="material-symbols-outlined" data-icon="delete">delete</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 bg-surface-subtle flex justify-end gap-3">
+<button class="px-6 py-2 border border-outline-variant rounded-xl hover:bg-surface-container-high transition-all font-label-md" onclick="toggleModal('modal-config')">Cancelar</button>
+<button class="px-6 py-2 bg-primary text-on-primary rounded-xl shadow-md hover:scale-105 transition-all font-label-md">Guardar Cambios</button>
+</div>
+</div>
+</div>
+<script>
+        function toggleModal(id) {
+            const modal = document.getElementById(id);
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function selectInstrument(type) {
+            const cards = document.querySelectorAll('.instrument-card');
+            cards.forEach(card => card.classList.add('opacity-60'));
+            
+            const selectedCard = document.getElementById('btn-' + type);
+            selectedCard.classList.remove('opacity-60');
+            
+            // Interaction logic could go here to swap table headers/logic
+            console.log('Instrumento seleccionado:', type);
+        }
+
+        // Simple validation visualization
+        document.querySelectorAll('.grade-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const val = parseFloat(e.target.value);
+                if (val < 10.5) {
+                    e.target.classList.add('text-secondary');
+                } else {
+                    e.target.classList.remove('text-secondary');
+                }
+            });
+        });
+
+        // Close modal on escape
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('modal-config').classList.add('hidden');
+                document.getElementById('modal-config').classList.remove('flex');
+            }
+        });
+    </script>
+</body></html>
