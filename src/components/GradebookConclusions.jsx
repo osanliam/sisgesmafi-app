@@ -13,10 +13,17 @@ const normalizeCompetenceName = (name = '') => name
   .toLowerCase()
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, ' ')
   .replace(/\s+/g, ' ')
   .trim();
 
-const getAutomaticConclusion = (competenceName) => CONCLUSIONS_FOR_C[normalizeCompetenceName(competenceName)] || '';
+const getAutomaticConclusion = (competenceName) => {
+  const normalizedName = normalizeCompetenceName(competenceName);
+  const matchingKey = Object.keys(CONCLUSIONS_FOR_C).find(key =>
+    normalizedName === key || normalizedName.startsWith(key) || key.startsWith(normalizedName)
+  );
+  return matchingKey ? CONCLUSIONS_FOR_C[matchingKey] : '';
+};
 
 export default function GradebookConclusions({ 
   structure, 
