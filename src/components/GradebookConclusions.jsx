@@ -19,6 +19,21 @@ const normalizeCompetenceName = (name = '') => name
 
 const getAutomaticConclusion = (competenceName) => {
   const normalizedName = normalizeCompetenceName(competenceName);
+  const matches = (...terms) => terms.every(term => normalizedName.includes(term));
+
+  // Los nombres creados por cada institución pueden llevar el área, códigos o
+  // signos adicionales. Se reconoce la competencia por sus palabras clave,
+  // sin aplicar el texto a competencias distintas.
+  if (matches('comunica oralmente', 'lengua materna')) {
+    return CONCLUSIONS_FOR_C['se comunica oralmente en su lengua materna'];
+  }
+  if (matches('lee diversos tipos', 'textos', 'lengua materna')) {
+    return CONCLUSIONS_FOR_C['lee diversos tipos de textos escritos en su lengua materna'];
+  }
+  if (matches('escribe diversos tipos', 'textos', 'lengua materna')) {
+    return CONCLUSIONS_FOR_C['escribe diversos tipos de textos en su lengua materna'];
+  }
+
   const matchingKey = Object.keys(CONCLUSIONS_FOR_C).find(key =>
     normalizedName === key || normalizedName.startsWith(key) || key.startsWith(normalizedName)
   );
@@ -150,7 +165,7 @@ export default function GradebookConclusions({
   // conclusión que haya sido personalizada por el docente.
   useEffect(() => {
     automaticConclusionRows.forEach(({ student, comp, conclusion }) => {
-      if (!getSavedConclusion(student.id, comp.id)) {
+      if (!getSavedConclusion(student.id, comp.id)?.trim()) {
         saveConclusion(student.id, courseId, comp.id, selectedPeriod, conclusion);
       }
     });
